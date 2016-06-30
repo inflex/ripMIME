@@ -1,0 +1,190 @@
+
+-----------------------------------ripOLE---------------------
+20081101-0215:PLD:DEV
+	Cleaned up source code to make sure it builds without 
+	errors with the new stricter build defaults on many
+	systems (such as Ubuntu 8.10).  
+
+	Changed the old bytedecoders file to now use the more
+	sane get_uintX() and get_intX() type calls that make
+	a bit more sense, also solves the annoying signed
+	return value casting issues.
+
+20051231-1055:PLD:
+	---Development update
+	Improved the image signature detection routines to allow for
+	variable length signatures and possible non-zero offsets.
+	Signatures are now stored as an array of struct typesig.
+
+	It could be possible to use an external filetype signature
+	library to do this process but because we're only wanting to
+	seek out images and of very few formats it simply isn't 
+	worth the overheads or speed penalty (we don't want to have 
+			to search through 200 bytes looking for up to 1000 
+			different filetypes).
+
+20051224-1030:PLD:
+	---Development update
+	Added primative image detection routines to pull out PNG
+	or JPG encoded data from an Escher formatted stream.  The
+	Escher format is rather complex so for now instead of trying
+	to decode it properly we just scan ahead in the data a short
+	distance to look for specific PNG or JPG signatures.
+
+20051212-1100:PLD:
+	---Version 0.2.0 RELEASE
+	Fixed up OLE Stream decoding - attachments now come out with
+	 the stream headers correctly stripped off. FINALLY!
+
+	Reverted the sector-ID handling back to a SIGNED 4-byte 
+	integer, as negative values are required to signal 
+	special sector ID's.
+
+20050315-1544:PLD:
+	Added last-sector check sanitisation while stepping along
+	FAT/miniFAT streams
+
+20050119-2108:PLD: 
+	Added filename sanitization, so that obscure 8-bit values
+		didn't get used.  See OLEUNWRAP_sanitize_filename()
+
+20041127-2051:PLD: 
+	Added sanity checking for the OLE header, see the fn
+		OLE_header_sanity_check().  If the OLE file fails
+		the sanity check, a return code of 103 will be 
+		issued.
+
+2004-Oct-18:
+	Changed unsigned int sectors to signed in OLE_follow_minichain()
+	so that negative sector requests could be detected and 
+	prevent segfaults.  Thanks to Gabriele Cariole for supplying
+	the offending mailpack.
+
+2004-Sep-30:
+	Added a loop detection system into OLE_follow_chain
+	to detect situations where the loop isn't tight
+	(ie, if it goes A->B->C->D->A). This requires two new
+	files to be added to the archive (bt-int.[ch])
+
+	Thanks to Brian for offering the mailpack which exposed
+	this condition.
+
+
+2004-Sep-25:
+	Fixed old style fprintf(stdout) logging calls.
+
+	Removed exit(1) calls.
+
+	Fixed up memory leak in OLE_get_block(), where bb would not
+	be explicitly free'd on either errors or normal exit.
+
+2004-Aug-16:
+	Added ole->FAT_limit into the general OLE struct so that when
+	traversing the FAT chain later, it can be possible to check 
+	for requests beyond the memory block limit (which would other-
+			wise cause segfaults)
+
+2004-Jul-17:
+	Fixed up unwanted verbosity about read mismatch in ole.c:321
+	Added macro VOLE which is 'if (ole->verbose)'.
+
+	Fixed up unwanted verbosity from ole when a negative sector 
+	read request is made and not in verbosity mode. (ole.c:891)
+
+2004-May-22:
+	Fixed up minifat walk routines, made current_sector comparisons
+		use hex notation rather than assumed signed int comparison.
+
+	Added start section sanity checking with minifat walker. ie, 
+		ensuring that the starting sector is infact greater than zero
+		
+2004-May-21:
+	Fixed up various memory leaks which were due to premature function
+		exits, but without cleaning up any preallocated memory blocks.
+
+
+2004-Apr-5:
+	19H50:PLD:REL
+		Released as v0.1.3
+
+	19H48:PLD:DEV
+		Added 'help' output for when no paramters are given.
+
+	14H22:PLD:DEV
+		Added stream size sanity checking when decoding the attachment size in 
+		olestream-unwrap which would occasionally generate some rather unlrealistc
+		stream sizes.  OLEUNWRAP_decode_attachment();
+
+	01H21:PLD:DEV
+		Finally fixed occasional segfault bug with some OLE2 files. 
+		Fix was to define the memory boundary limit of the ole properties
+		field and check on each pass of the loop that it wasn't being
+		breached.
+		
+
+2003-Nov-26:
+	20H13:PLD:DEV
+		Release 0.0.4
+		Fixed up some potential logging segfaults if used in 
+		conjunction with syslog output.
+
+2003-Nov-17:
+	16H20:PLD:DEV
+		Added bounds checking to entire processing system so that 
+		it cannot request a sector outside of the real limits of 
+		the loaded OLE file.
+		I consider this only to be a partial fix to a problem of 
+		various documents which do not seem to be able to be decoded
+		reliably, fortunately at least the bounds checking stops the
+		segfaults.
+
+2003-Oct-31:
+	07H38:PLD:DEV
+		Added -q (quiet) option, which silences various non-fatal
+		error messages.
+
+2003-Aug-28:
+	22H04:PLD:DEV
+		Added bounds checking on Mini-FAT loader, to ensure it would
+		not attempt to load up a FAT chain from a negative starting
+		sector.
+
+2003-Jul-16:
+	21H23:PLD:DEV
+		Added bounds check on chain follower/loader so that it would
+		not attempt to seek from a starting sector < 0
+
+2003-Jul-11:
+	19H53:PLD:DEV
+		Added bounds checking to OLE_dbstosbs()
+
+2003-Jul-05:
+	01H18:PLD:DEV
+		Added --save-unknown-streams facility, this allows saving
+			of streams which ripOLE doesn't yet know how to explicitly
+			handle.
+
+2003-Jul-04:
+	20H52:PLD:DEV
+		Posted to Freshmeat
+		Applied small patch to stop compile warnings about bp and
+		buffer pointers being used (possibly) uninitialised.
+
+	08H13:PLD:DEV 
+		Fixed segfault in code when extended-FAT/BAT/DIF was
+		required.  This was caused by the header-conversion fn
+		because it did not stop attempting to copy sectors beyond
+		the first 109.
+
+	00H10:PLD:DEV: 
+		Fixed all 3 FAT modes, mini, standard and extended.
+
+		All files now decode assuming they have the 'Ole10Native'
+		element-name
+
+2003-Jul-03:
+	Initial code release, not currently usable to extract files
+		but the code does dump the OLE streams to file, in which
+		you can see the attachment information.
+
+

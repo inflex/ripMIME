@@ -1,0 +1,31 @@
+INSTALL---------------------------------------------------------------
+
+Very simple (as root)...
+
+	make
+	make install
+	
+	[ Make install will install the ripmime binary to /usr/local/bin, 
+	there are no other support files required. ]
+	
+To use ripMIME...
+
+	If you have an MIME encoded archive (say from sendmail's output) 
+	called recvmail001.mime and you wish to unpack it to a directory
+	(which already exists) called "/var/tmp/unpack", then use ripMIME
+	as follows...
+	
+		ripmime -i recvmail001.mime -d /var/tmp/unpack
+		
+It's truly that simple.
+
+--- If you want more PERFORMANCE out of ripMIME (most people will), you can
+	select some compile flags in the Makefile which suit your CPU better,
+	ie, for recent Pentiums/Celerons, you can use
+
+		-Wall -O3 -march=i686
+
+
+----------------------------------------------------------------------
+
+Enjoy.

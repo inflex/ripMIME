@@ -1,0 +1,169 @@
+.\" ripMIME is a simple program which provides extensive email attachment extraction abilities.
+.TH "ripMIME" "1" "1.4.0.1" "Paul L Daniels" "MIME decoders"
+.SH "NAME"
+ripMIME \- email attachment / decomposition tool.
+.SH "SYNTAX"
+ripMIME \-i <mime file> \-d <directory> 
+.br 
+[\-p prefix][\-e [headerfile]]
+.br 
+[\-v][\-q][\-\-verbose\-contenttype][\-\-verbose\-oldstyle][\-\-verbose\-defects][\-\-stdout][\-\-stderr][\-\-syslog]
+.br 
+[\-\-paranoid]
+.br 
+[\-\-name\-by\-type][\-\-no\-nameless][\-\-overwrite][\-\-no_nameless]
+.br 
+[\-\-unique_names[\-\-prefix|\-\-postfix|\-\-infix]][\-\-mailbox]
+.br 
+[\-\-no\-tnef][\-\-no\-quotedprintable][\-\-no\-uudecode][\-\-no\-ole][\-\-no\-doublecr][\-\-no\-mht]
+.br 
+[\-\-disable\-qmail\-bounce][\-\-recursion\-max <level>]
+.br 
+[\-\-no\-multiple\-filenames]
+.br 
+[\-\-exteded\-errors][\-\-debug][\-\-version|\-V][\-\-buildcodes][\-h]
+.br 
+.SH "DESCRIPTION"
+ripMIME is a command line tool used to aid in the extraction of email borne attachments to files which can be processed using other UNIX tools.  ripMIME supports both the RFC MIME standards as well as being able to behave according to various MUA 'features' which are often used as exploitation holes.
+.SH "OPTIONS"
+.LP 
+.TP 
+\-i
+Input MIME encoded file (use '\-' to input from STDIN)
+
+.TP 
+\-d
+Output directory
+.TP 
+\-p 
+Specify prefix filename to be used on files without a filename (default 'text')
+.TP 
+\-e [headers file name]
+Dump headers from mailpack (default '_headers_')
+.TP 
+\-v
+Turn on verbosity
+.TP 
+\-q
+Run quietly, do not report non\-fatal errors
+
+.TP 
+\-\-verbose\-contenttype
+Turn on verbosity of file content type
+.TP 
+\-\-verbose\-oldstyle
+Uses the v1.2.x style or filename reporting
+.TP 
+\-\-verbose\-defects
+Report MIME header/body defects located in the mailpack
+.TP 
+\-\-stdout
+All reporting goes to stdout (Default)
+.TP 
+\-\-stderr
+All reporting goes to stderr
+.TP 
+\-\-syslog
+All reporting goes to syslog
+.TP 
+\-\-no\-paranoid
+[ Deprecated ] Turns off strict ascii\-alnum filenaming
+.TP 
+\-\-paranoid
+Converts all filenames to strict 7\-bit compliance
+.TP 
+\-\-name\-by\-type
+Saves a given attachment by its content\-type if it has no other name
+.TP 
+\-\-no\-nameless
+Do not save nameless attachments
+.TP 
+\-\-overwrite
+Overwrite files if they have the same name on extraction
+.TP 
+\-\-unique\-names
+Dont overwrite existing files (This is the default behaviour)
+.TP 
+\-\-prefix
+rename by putting unique code at the front of the filename
+.TP 
+\-\-postfix
+rename by putting unique code at the end of the filename
+.TP 
+\-\-infix
+rename by putting unique code in the middle of the filename
+.TP 
+\-\-recursion\-max <maximum level>
+Set the maximum recursion level into a mailpack.  Often emails are forwarded copies of an existing email, each time this is done a new recursion level is required.  Malicious emails can be constructed with many hundereds of recursion levels to induce stack faults in decoding programs.  ripMIME is hard coded with a default of 20 levels, this may be overidden using this parameter.
+.TP 
+\-\-mailbox
+Process mailbox file
+.TP 
+\-\-extended\-errors
+Returns error codes for non\-fatal decoding situations
+.TP 
+\-\-debug
+Produces detailed information about the whole decoding process
+
+.SS "Attachment type decoding switches"
+.TP 
+\-\-no\-tnef
+Turn off TNEF/winmail.dat decoding
+.TP 
+\-\-no\-ole
+Turn off OLE decoding
+.TP 
+\-\-no\-uudecode
+Turns off the facility of detecting UUencoded attachments in emails
+.TP 
+\-\-no\-quotedprintable
+Turns off the facility of decoding QuotedPrintable data
+.TP 
+\-\-no\-doublecr
+Turns off saving of double\-CR embedded data
+.TP 
+\-\-no\-mht
+Turns off MHT (a Microsoft mailpack attachment format ) decoding
+.TP 
+\-\-disable\-qmailbounce
+Turns off ripMIME's look\-ahead searching for RFC822 headers within a body of text. Normally the look\-ahead is useful for decoding embedded emails which have been bounced back by systems like qmail, but have been included in such a way that they are not meant to be decoded, unfortunately some MUA (Outlook for one) still decode it, hence we need to by default check for attachments in such forwarded bodies.
+.TP 
+\-\-no\-multiple\-filenames
+Turns off the behaviour of handling multiple filename occurances in a single MIME header. Normally ripMIME will generate a hard link for each additional filename beyond the original attachment filename detected.
+
+.SS Auxillary parameters
+.TP 
+\-\-buildcodes
+Displays the information obtained by the Makefile script when ripMIME was built.  This includes the Unix timestamp, human readable version of the timestamp and the output from 'uname \-a'.
+.TP 
+\-V \-\-version
+Give version information
+.TP 
+\-h
+Terse information on how to use ripMIME.
+.SH "FILES"
+.I None
+.br 
+.SH "ENVIRONMENT VARIABLES"
+.TP 
+.I None
+.SH "EXAMPLES"
+.LP 
+To unpack an email in a file 'mailpack' to the directory /tmp with verbose output of the files unpacked;
+.LP 
+ripmime \-i mailpack \-v \-d /tmp
+.LP 
+
+.SH "AUTHORS"
+Paul L Daniels
+.br 
+ripMIME WWW site http://www.pldaniels.com/ripmime
+.br 
+ripMIME mailing list <ripmime\-general@pldaniels.com>
+.br 
+For mailpacks which do not appear to decode correctly \- please email to <mailpacks\-2004@pldaniels.com>
+.SH "SEE ALSO"
+.BR altermime (1),
+.BR inflex (1),
+.BR ripole (1),
+.BR opentnef (1)

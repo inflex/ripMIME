@@ -1,0 +1,20 @@
+---------
+	2005-December-12
+
+	ripOLE has now started to become a useful tool in its own
+	right, though it is more directly being developed for 
+	incorporation into ripMIME and subsequently Xamime.
+
+	pldaniels@pldaniels.com
+
+---------
+
+To check for [and save] attachments in a MS Office file,
+	simply do the following:
+
+	./ripole -i officefile.doc -v -d tmp
+
+..and ripOLE will decode the attachments to the 'tmp' 
+	directory
+
+	-END.

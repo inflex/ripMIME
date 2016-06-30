@@ -1,0 +1,538 @@
+
+++++ ms-tnef ++++
+TNEF_SIGNATURE (0x223E9F78), offset: 0x00000000
+Attach Key -- 0x100D
+ATTRIBUTE: attTnefVersion (0x00089006)
+
+  Component  -- Message (0x01)
+  Offset     -- 0x00000006
+  Size       -- 4
+  Encoding   -- Tnef Version Information
+  Version:
+
+    1.0
+
+  Computed Checksum 0x0001
+  Expected Checksum 0x0001
+
+ATTRIBUTE: attOemCodepage (0x00069007)
+
+  Component  -- Message (0x01)
+  Offset     -- 0x00000015
+  Size       -- 8
+  Encoding   -- Tnef Codepage Information
+  Codepage:
+
+    Primary:   1252
+    Secondary: 0
+
+  Computed Checksum 0x00E8
+  Expected Checksum 0x00E8
+
+ATTRIBUTE: attPriority (0x0004800D)
+
+  Component  -- Message (0x01)
+  Offset     -- 0x00000028
+  Size       -- 2
+  Encoding   -- Down-level Attribute
+  Data:
+
+    02 00                                                     *..*
+    
+  Computed Checksum 0x0002
+  Expected Checksum 0x0002
+
+ATTRIBUTE: attRecipTable (0x00069004)
+
+  Component  -- Message (0x01)
+  Offset     -- 0x00000035
+  Size       -- 256
+  Encoding   -- MAPI Table
+  No. Rows   -- 1
+  ROW 0:
+
+    No. Props  -- 12
+    PROPERTY: PR_ROWID (0x30000003)
+
+      Offset     -- 0x00000046
+      PROP_TYPE  -- PT_LONG (0x00000003)
+      Size       -- 4
+      Data:
+
+        03 00 00 00                                           *....*
+        
+      Local Checksum -- 0x0036
+
+    PROPERTY: PR_RESPONSIBILITY (0x0E0F000B)
+
+      Offset     -- 0x0000004E
+      PROP_TYPE  -- PT_BOOLEAN (0x0000000B)
+      Size       -- 4
+      Data:
+
+        00 00 00 00                                           *....*
+        
+      Local Checksum -- 0x0028
+
+    PROPERTY: PR_ENTRYID (0x0FFF0102)
+
+      Offset     -- 0x00000056
+      PROP_TYPE  -- PT_BINARY (0x00000102)
+      Encoding   -- multi-valued
+      No. values -- 1
+      Size (1)   -- 59
+      Data (1):
+
+        00 00 00 00 81 2B 1F A4 -- BE A3 10 19 9D 6E 00 DD    *.....+.......n..*
+        01 0F 54 02 00 00 00 00 -- 62 6C 6F 6E 67 40 75 69    *..T.....blong@ui*
+        75 63 2E 65 64 75 00 53 -- 4D 54 50 00 62 6C 6F 6E    *uc.edu.SMTP.blon*
+        67 40 75 69 75 63 2E 65 -- 64 75 00                   *g@uiuc.edu.*
+        
+      Pad -- 1 byte
+      Local Checksum -- 0x12C0
+
+    PROPERTY: PR_ADDRTYPE (0x3002001E)
+
+      Offset     -- 0x0000009E
+      PROP_TYPE  -- PT_STRING8 (0x0000001E)
+      Encoding   -- multi-valued
+      No. values -- 1
+      Size (1)   -- 5
+      Data (1):
+
+        53 4D 54 50 00                                        *SMTP.*
+        
+      Pad -- 3 bytes
+      Local Checksum -- 0x019A
+
+    PROPERTY: PR_EMAIL_ADDRESS (0x3003001E)
+
+      Offset     -- 0x000000B2
+      PROP_TYPE  -- PT_STRING8 (0x0000001E)
+      Encoding   -- multi-valued
+      No. values -- 1
+      Size (1)   -- 15
+      Data (1):
+
+        62 6C 6F 6E 67 40 75 69 -- 75 63 2E 65 64 75 00       *blong@uiuc.edu.*
+        
+      Pad -- 1 byte
+      Local Checksum -- 0x05D5
+
+    PROPERTY: PR_RECIPIENT_TYPE (0x0C150003)
+
+      Offset     -- 0x000000CE
+      PROP_TYPE  -- PT_LONG (0x00000003)
+      Size       -- 4
+      Data:
+
+        01 00 00 00                                           *....*
+        
+      Local Checksum -- 0x0025
+
+    PROPERTY: PR_OBJECT_TYPE (0x0FFE0003)
+
+      Offset     -- 0x000000D6
+      PROP_TYPE  -- PT_LONG (0x00000003)
+      Size       -- 4
+      Data:
+
+        06 00 00 00                                           *....*
+        
+      Local Checksum -- 0x0116
+
+    PROPERTY: PR_DISPLAY_NAME (0x3001001E)
+
+      Offset     -- 0x000000DE
+      PROP_TYPE  -- PT_STRING8 (0x0000001E)
+      Encoding   -- multi-valued
+      No. values -- 1
+      Size (1)   -- 17
+      Data (1):
+
+        27 62 6C 6F 6E 67 40 75 -- 69 75 63 2E 65 64 75 27    *'blong@uiuc.edu'*
+        00                                                    *.*
+        
+      Pad -- 3 bytes
+      Local Checksum -- 0x0623
+
+    PROPERTY: PR_SEARCH_KEY (0x300B0102)
+
+      Offset     -- 0x000000FE
+      PROP_TYPE  -- PT_BINARY (0x00000102)
+      Encoding   -- multi-valued
+      No. values -- 1
+      Size (1)   -- 20
+      Data (1):
+
+        53 4D 54 50 3A 42 4C 4F -- 4E 47 40 55 49 55 43 2E    *SMTP:BLONG@UIUC.*
+        45 44 55 00                                           *EDU.*
+        
+      Local Checksum -- 0x05C5
+
+    PROPERTY: PR_DISPLAY_TYPE (0x39000003)
+
+      Offset     -- 0x0000011E
+      PROP_TYPE  -- PT_LONG (0x00000003)
+      Size       -- 4
+      Data:
+
+        00 00 00 00                                           *....*
+        
+      Local Checksum -- 0x003C
+
+    PROPERTY: PR_SEND_RICH_INFO (0x3A40000B)
+
+      Offset     -- 0x00000126
+      PROP_TYPE  -- PT_BOOLEAN (0x0000000B)
+      Size       -- 4
+      Data:
+
+        01 00 00 00                                           *....*
+        
+      Local Checksum -- 0x0086
+
+    PROPERTY: PR_INSTANCE_KEY (0x0FF60102)
+
+      Offset     -- 0x0000012E
+      PROP_TYPE  -- PT_BINARY (0x00000102)
+      Encoding   -- multi-valued
+      No. values -- 1
+      Size (1)   -- 4
+      Data (1):
+
+        00 00 00 03                                           *....*
+        
+      Local Checksum -- 0x0110
+
+    PROPERTIES: end
+    
+  ROWS: end
+  Computed Size 256
+  Expected Size 256
+  Computed Checksum 0x298F
+  Expected Checksum 0x298F
+
+ATTRIBUTE: attMessageClass (0x00078008)
+
+  Component  -- Message (0x01)
+  Offset     -- 0x00000140
+  Size       -- 24
+  Encoding   -- Down-level Attribute
+  Data:
+
+    49 50 4D 2E 4D 69 63 72 -- 6F 73 6F 66 74 20 4D 61        *IPM.Microsoft Ma*
+    69 6C 2E 4E 6F 74 65 00                                   *il.Note.*
+    
+  Computed Checksum 0x0831
+  Expected Checksum 0x0831
+
+ATTRIBUTE: attSubject (0x00018004)
+
+  Component  -- Message (0x01)
+  Offset     -- 0x00000163
+  Size       -- 60
+  Encoding   -- Down-level Attribute
+  Data:
+
+    41 41 41 41 41 41 41 41 -- 41 41 41 41 41 52 52 52        *AAAAAAAAAAAAARRR*
+    52 52 52 52 52 52 47 47 -- 47 47 47 47 47 47 47 47        *RRRRRRGGGGGGGGGG*
+    47 47 48 48 48 48 48 48 -- 48 48 48 48 21 21 21 21        *GGHHHHHHHHHH!!!!*
+    21 21 21 21 21 21 21 21 -- 21 21 21 00                    *!!!!!!!!!!!.*
+    
+  Computed Checksum 0x0E42
+  Expected Checksum 0x0E42
+
+ATTRIBUTE: attDateSent (0x00038005)
+
+  Component  -- Message (0x01)
+  Offset     -- 0x000001AA
+  Size       -- 14
+  Encoding   -- Down-level DTR
+  Date:
+
+    Friday, 05/23/1997, 11:29:10
+
+    CD 07 05 00 17 00 0B 00 -- 1D 00 0A 00 05 00              *..............*
+    
+  Computed Checksum 0x0127
+  Expected Checksum 0x0127
+
+ATTRIBUTE: attDateModified (0x00038020)
+
+  Component  -- Message (0x01)
+  Offset     -- 0x000001C3
+  Size       -- 14
+  Encoding   -- Down-level DTR
+  Date:
+
+    Friday, 05/23/1997, 11:27:59
+
+    CD 07 05 00 17 00 0B 00 -- 1B 00 3B 00 05 00              *..........;...*
+    
+  Computed Checksum 0x0156
+  Expected Checksum 0x0156
+
+ATTRIBUTE: attMessageID (0x00018009)
+
+  Component  -- Message (0x01)
+  Offset     -- 0x000001DC
+  Size       -- 33
+  Encoding   -- Down-level Attribute
+  Data:
+
+    34 32 38 35 34 32 30 43 -- 34 33 44 33 44 30 31 31        *4285420C43D3D011*
+    42 36 35 37 30 30 32 30 -- 41 46 41 31 41 30 30 33        *B6570020AFA1A003*
+    00                                                        *.*
+    
+  Computed Checksum 0x06D3
+  Expected Checksum 0x06D3
+
+ATTRIBUTE: attMAPIProps (0x00069003)
+
+  Component  -- Message (0x01)
+  Offset     -- 0x00000208
+  Size       -- 508
+  Encoding   -- MAPI Properties
+  No. Props  -- 18
+  PROPERTY: PR_ORIGINATOR_DELIVERY_REPORT_REQUESTED (0x0023000B)
+
+    Offset     -- 0x00000215
+    PROP_TYPE  -- PT_BOOLEAN (0x0000000B)
+    Size       -- 4
+    Data:
+
+      00 00 00 00                                             *....*
+      
+    Local Checksum -- 0x002E
+
+  PROPERTY: PR_PRIORITY (0x00260003)
+
+    Offset     -- 0x0000021D
+    PROP_TYPE  -- PT_LONG (0x00000003)
+    Size       -- 4
+    Data:
+
+      00 00 00 00                                             *....*
+      
+    Local Checksum -- 0x0029
+
+  PROPERTY: PR_READ_RECEIPT_REQUESTED (0x0029000B)
+
+    Offset     -- 0x00000225
+    PROP_TYPE  -- PT_BOOLEAN (0x0000000B)
+    Size       -- 4
+    Data:
+
+      00 00 00 00                                             *....*
+      
+    Local Checksum -- 0x0034
+
+  PROPERTY: PR_SENSITIVITY (0x00360003)
+
+    Offset     -- 0x0000022D
+    PROP_TYPE  -- PT_LONG (0x00000003)
+    Size       -- 4
+    Data:
+
+      00 00 00 00                                             *....*
+      
+    Local Checksum -- 0x0039
+
+  PROPERTY: PR_CLIENT_SUBMIT_TIME (0x00390040)
+
+    Offset     -- 0x00000235
+    PROP_TYPE  -- PT_SYSTIME (0x00000040)
+    Size       -- 8
+    Data:
+
+      20 B7 AA 71 96 67 BC 01                                 * ..q.g..*
+      
+    Local Checksum -- 0x0425
+
+  PROPERTY: PR_CONVERSATION_TOPIC (0x0070001E)
+
+    Offset     -- 0x00000241
+    PROP_TYPE  -- PT_STRING8 (0x0000001E)
+    Encoding   -- multi-valued
+    No. values -- 1
+    Size (1)   -- 60
+    Data (1):
+
+      41 41 41 41 41 41 41 41 -- 41 41 41 41 41 52 52 52      *AAAAAAAAAAAAARRR*
+      52 52 52 52 52 52 47 47 -- 47 47 47 47 47 47 47 47      *RRRRRRGGGGGGGGGG*
+      47 47 48 48 48 48 48 48 -- 48 48 48 48 21 21 21 21      *GGHHHHHHHHHH!!!!*
+      21 21 21 21 21 21 21 21 -- 21 21 21 00                  *!!!!!!!!!!!.*
+      
+    Local Checksum -- 0x0F0D
+
+  PROPERTY: PR_CONVERSATION_INDEX (0x00710102)
+
+    Offset     -- 0x00000289
+    PROP_TYPE  -- PT_BINARY (0x00000102)
+    Encoding   -- multi-valued
+    No. values -- 1
+    Size (1)   -- 22
+    Data (1):
+
+      01 BC 67 96 71 A1 0C 42 -- 85 43 D3 43 11 D0 B6 57      *..g.q..B.C.C...W*
+      00 20 AF A1 A0 03                                       *. ....*
+      
+    Pad -- 2 bytes
+    Local Checksum -- 0x0984
+
+  PROPERTY: PR_SENDER_ADDRTYPE (0x0C1E001E)
+
+    Offset     -- 0x000002AD
+    PROP_TYPE  -- PT_STRING8 (0x0000001E)
+    Encoding   -- multi-valued
+    No. values -- 1
+    Size (1)   -- 5
+    Data (1):
+
+      53 4D 54 50 00                                          *SMTP.*
+      
+    Pad -- 3 bytes
+    Local Checksum -- 0x0192
+
+  PROPERTY: PR_SENDER_EMAIL_ADDRESS (0x0C1F001E)
+
+    Offset     -- 0x000002C1
+    PROP_TYPE  -- PT_STRING8 (0x0000001E)
+    Encoding   -- multi-valued
+    No. values -- 1
+    Size (1)   -- 19
+    Data (1):
+
+      6E 6F 61 68 62 61 6E 40 -- 64 76 73 77 65 62 2E 63      *noahban@dvsweb.c*
+      6F 6D 00                                                *om.*
+      
+    Pad -- 1 byte
+    Local Checksum -- 0x076C
+
+  PROPERTY: PR_RTF_SYNC_BODY_CRC (0x10060003)
+
+    Offset     -- 0x000002E1
+    PROP_TYPE  -- PT_LONG (0x00000003)
+    Size       -- 4
+    Data:
+
+      3B EE 7D 8D                                             *;.}.*
+      
+    Local Checksum -- 0x024C
+
+  PROPERTY: PR_RTF_SYNC_BODY_COUNT (0x10070003)
+
+    Offset     -- 0x000002E9
+    PROP_TYPE  -- PT_LONG (0x00000003)
+    Size       -- 4
+    Data:
+
+      14 00 00 00                                             *....*
+      
+    Local Checksum -- 0x002E
+
+  PROPERTY: PR_RTF_SYNC_BODY_TAG (0x1008001E)
+
+    Offset     -- 0x000002F1
+    PROP_TYPE  -- PT_STRING8 (0x0000001E)
+    Encoding   -- multi-valued
+    No. values -- 1
+    Size (1)   -- 21
+    Data (1):
+
+      57 48 41 54 48 41 53 48 -- 41 50 50 45 4E 45 44 54      *WHATHASHAPPENEDT*
+      4F 55 53 3F 00                                          *OUS?.*
+      
+    Pad -- 3 bytes
+    Local Checksum -- 0x062B
+
+  PROPERTY: PR_RTF_COMPRESSED (0x10090102)
+
+    Offset     -- 0x00000315
+    PROP_TYPE  -- PT_BINARY (0x00000102)
+    Encoding   -- multi-valued
+    No. values -- 1
+    Size (1)   -- 180
+    Data (1):
+
+      B0 00 00 00 9B 01 00 00 -- 4C 5A 46 75 50 49 B9 90      *........LZFuPI..*
+      FF 00 0A 01 0F 02 15 02 -- A8 05 EB 02 83 00 50 02      *..............P.*
+      F2 09 02 00 63 68 0A C0 -- 73 65 74 32 37 06 00 06      *....ch..set27...*
+      C3 02 83 32 03 C5 02 00 -- 70 72 42 71 11 E2 73 74      *...2....prBq..st*
+      65 6D 02 83 33 F7 02 E4 -- 07 13 02 83 34 03 45 13      *em..3.......4.E.*
+      35 07 6D 02 80 FE 7D 0A -- 80 08 CF 09 D9 02 80 0A      *5.m...}.........*
+      81 0D B1 0B 60 E0 6E 67 -- 31 30 33 14 50 0B 0A 15      *....`.ng103.P...*
+      61 F9 0B F0 34 20 0A 85 -- 1B 9F 1C AF 1D BF 1E CF      *a...4 ..........*
+      F7 1F DF 20 EF 21 F8 77 -- 11 80 05 40 11 80 04 20      *... .!.w...@... *
+      19 11 80 70 70 09 F0 09 -- 80 20 74 6F F0 20 75 73      *...pp.... to. us*
+      3F 1A AC 0A A0 03 60 13 -- D0 2E 63 05 40 0A 85 17      *?.....`...c.@...*
+      61 00 26 A0                                             *a.&.*
+      
+    Local Checksum -- 0x39D6
+
+  PROPERTY: PR_RTF_SYNC_PREFIX_COUNT (0x10100003)
+
+    Offset     -- 0x000003D5
+    PROP_TYPE  -- PT_LONG (0x00000003)
+    Size       -- 4
+    Data:
+
+      00 00 00 00                                             *....*
+      
+    Local Checksum -- 0x0023
+
+  PROPERTY: PR_RTF_SYNC_TRAILING_COUNT (0x10110003)
+
+    Offset     -- 0x000003DD
+    PROP_TYPE  -- PT_LONG (0x00000003)
+    Size       -- 4
+    Data:
+
+      00 00 00 00                                             *....*
+      
+    Local Checksum -- 0x0024
+
+  PROPERTY: PR_CREATION_TIME (0x30070040)
+
+    Offset     -- 0x000003E5
+    PROP_TYPE  -- PT_SYSTIME (0x00000040)
+    Size       -- 8
+    Data:
+
+      00 00 02 47 96 67 BC 01                                 *...G.g..*
+      
+    Local Checksum -- 0x027A
+
+  PROPERTY: PR_LAST_MODIFICATION_TIME (0x30080040)
+
+    Offset     -- 0x000003F1
+    PROP_TYPE  -- PT_SYSTIME (0x00000040)
+    Size       -- 8
+    Data:
+
+      00 00 02 47 96 67 BC 01                                 *...G.g..*
+      
+    Local Checksum -- 0x027B
+
+  PROPERTY: PR_SUBJECT_PREFIX (0x003D001E)
+
+    Offset     -- 0x000003FD
+    PROP_TYPE  -- PT_STRING8 (0x0000001E)
+    Encoding   -- multi-valued
+    No. values -- 1
+    Size (1)   -- 1
+    Data (1):
+
+      00                                                      *.*
+      
+    Pad -- 3 bytes
+    Local Checksum -- 0x005D
+
+  PROPERTIES: end
+  Computed Size 508
+  Expected Size 508
+  Computed Checksum 0x6E9E
+  Expected Checksum 0x6E9E
+
+TNEF: end

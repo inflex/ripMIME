@@ -1,0 +1,8 @@
+
+Original code by Paul L Daniels
+
+Source documentation supplied by:
+	defrost, Chris Hine and google
+
+Patches:
+	Chris Hine:0.0.3:2003-07-04: Buffer,bp initialisation patch.

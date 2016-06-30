@@ -1,0 +1,98 @@
+Original Author : Paul L Daniels
+
+---------------------------
+Author : Farit
+Date   : 14/01/2004
+Contrib: Supplied various mailpacks with exploits/viruses/worms and
+			alternative 'header' prefixing.
+
+---------------------------
+Change : Correction of various spurilous messages appearing even when 
+		verbosity is not active
+Date   : 26/01/2003
+Author : Chris Hine
+
+---------------------------
+Change : Change char * to unsigned char * in strlower() function to deal with
+		non-ASCII characters ( ie, French, Chinese )
+Date   : 09/11/2002
+Author : Emmanuel Collignon
+
+
+
+---------------------------
+Change : Patch to deal with spaces inbetween name=, filename= type
+		MIME headers. Submitted by Phil Brutsche
+Date   : 06/11/2002
+
+
+---------------------------
+Change : Updates to FFGET routines.  Improve handling of one-off issues and
+		buffer boundary conditions
+Author : Joseph Gooch
+Email  :
+Date   : 27/02/2002
+
+Notification : Version number update (I hate it when I forget that)
+Notifier     : wes schreiner
+Date         : 21/02/2002
+
+---------------------------
+Change : TNEF decoding improvements - Quoted Printable decoding fixes
+Author : Chea Chee Keong
+Email  : ckchea@mailandnews.com
+Date   : 20/02/2002
+
+---------------------------
+Change : CRCR logic clarification
+Author : Joseph Gooch
+Date   : 18/02/2002
+
+---------------------------
+Change : TNEF decoding improvements
+Author : Chea Chee Keong
+Email  : ckchea@mailandnews.com
+Date   : 01/01/2002
+
+---------------------------
+Change : add ability to read mimepack from STDIN
+Author : Matthew McNaughton <mcnaught@cs.ualberta.ca>
+Date   : 24/11/2000
+
+---------------------------
+Fixes:
+Change : Correction for handling varying line-length BASE64 encoded files
+Author : Trent, Michael (Xerox USA) and John Armstrong (EFI.com)
+Date   : 05/11/2001
+
+---------------------------
+Change : Support for SGI systems (fixes lockup)
+Author : Don Lafontaine <lafont02@cn.ca>
+Date   : 27/09/2001
+
+---------------------------
+Change : Correct problem where a filename will contain multiple consecutive /'s
+Author : James Cownie
+Date   : 03/02/2001
+
+---------------------------
+Change : Replaced the tmpnam() call for temporary filename with MIME_tmpnam()
+Author : Dave DeMaagd & Paul L Daniels
+Date   : 29/01/2001
+
+---------------------------
+Change : added patch to detected boundaries without surrounding quotations
+Author : Rolf
+Date   : 12/01/2001
+
+
+---------------------------
+Support:
+Date : 07/01/2000
+Person: Hans Harder
+What: Supplied me with a mailpack which couldn't be correctly decoded by ripMIME due to it not having a trailing CR/LF after the base64 encoded portion of the attachment.
+
+---------------------------
+Date : 29/01/2001
+Person : Sven Rassmaan
+What: Supplied me with a mailpack/spool which I could test the multiple-email-spool-extract facility (also happened to be the requestor or such)

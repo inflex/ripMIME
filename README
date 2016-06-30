@@ -1,0 +1,19 @@
+README----------------------------------------------------------------
+
+ripMIME is a small program which has been developed as part of the
+commercial Xamime development (http://www.xamime.com).
+
+ripMIME is being presented here to the public under a BSD style 
+licence (see the LICENCE file included in with this package).
+
+ripMIME has been written with one sole purpose in mind, to extract the
+attached files out of a MIME encoded email package.
+
+ripMIME was written by Paul L Daniels of PLDaniels.
+
+ripMIME is Copyright to Paul L Daniels.
+
+Any comments/suggestions/correspondence can be directed to Paul Daniels
+via email at pldaniels@pldaniels.com.
+
+----------------------------------------------------------------------

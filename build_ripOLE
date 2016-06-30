@@ -1,0 +1,4 @@
+#!/bin/sh
+cd ripOLE
+make clean 
+make 

@@ -1,0 +1,1762 @@
+ripMIME CHANGELOG
+
+Format of entry line:
+	- <Developer initials>:<Change made for REL[ease] or DEV[elopment] versions>
+
+CHANGES---------------------------------------------------------------
+Sat Dec 13 2008
+	-PLD:DEV:
+	Fixed up segfault during debug run from missing parameter in LOGGER
+	debug line
+
+Fri Nov 08 2008
+	-PLD:REL:1.4.0.9
+	Fixed up the BASE64 decoding detection of boundaries which are
+	sometimes missed because of the FFGET buffer limits are reached
+	part way through the boundary line.  This is now solved by 
+	calling a FFGET_fgets() on the lines which are presumed to 
+	include a boundary specifier (eg, line starts with a leading
+			hyphen ).
+	This situation was primarily due to the use of the FFGET_fgetc()
+	call which only looks ahead 1 char, before calling the BS_cmp().
+
+
+Mon Nov 03 2008
+	-PLD:REL:1.4.0.8
+	Cleaned up ripOLE, OpenTNEF and ripMIME compile warnings based on
+	the new more pedantic default settings as with Ubuntu 8.10.
+
+	Updated ripOLE to handle nameless / unknown stream blobs, now
+	produces OLE_data.xxx files in place of the random names being
+	generated previously.
+
+
+Sun Sep 21 2008
+	-PLD:DEV
+		Adjusted tnef/tnef.c to ensure consistent filename generation
+		between multiple passes of a decode within the same process
+		(see TNEF changelog)
+
+Fri Feb 08 2008
+	-PLD:DEV
+		Added QP decoding patch from  jjohnston
+			Added invalid char detection
+
+Tue Oct 30 2007
+	- PLD:DEV
+		Added small patch from Claudio Jeker to fix a potential overflow
+		in MIME_headers.c 
+
+Wed Oct 24 2007
+	- PLD:DEV
+		Added MIME_read_raw which uses open/read/write calls rather
+		than fopen/fread/fwrite.  This isn't yet used directly by
+		ripMIME but rather is needed for its parent development 
+		tree for Xamime.
+
+Sun Jul 08 2007
+	- PLD:DEV
+		Fixed FFGET_fgets call boundary condition fault that can cause
+		excess bytes to be consumed resulting in either smaller output
+		files or potential segfaults.
+
+		This was an incredibly difficult bug to track down as it simply
+		refused to show up in regular testing and when it did finally 
+		show up it was still very confusing in its behavior due to it
+		being a combination of two bugs in the same function.
+
+
+Fri Mar 03 2006
+	- PLD:DEV:2211
+		Added a header fixing routine in MIME_headers, this fix attempts
+		to unwrap headers which are missing a leading space on the next
+		line (original mailpack provided by Ruust - thanks)
+
+		This feature can be disabled using --disable-headerfix
+
+
+Fri Feb 24 2006
+	- PLD:DEV:1748
+		Fixed situation where a null-body email would result in the _header_
+		file not being produced even when explicitly asked to via the '-e'
+		option
+
+Mon Dec 12 2005
+	- PLD:REL:1235
+		
+		RELEASE 1.4.0.6
+
+		Updated ripOLE to version 0.2.0
+
+
+Wed Mar 30 2005
+	- PLD:REL:0644
+
+		RELEASE 1.4.0.5
+
+		Fixed -d -i - combination error causing ripMIME to fail to decode
+			Thanks to Daniel Fraga for noticing this.
+
+		
+Tue Mar 29 2005
+	- PLD:REL:1703
+		RELEASE 1.4.0.4
+
+Tue Mar 15 2005
+	- PLD:DEV:1545
+		OLE2 decoding fix (see ripOLE)
+
+Thu Feb 03 2005
+	- PLD:DEV:1950
+		Added recursion facility if the input mailpack/MIME file is 
+		a directory.
+
+Fri Dec 17 2004
+	- Release 1.4.0.3
+	- Improved attachment search abilities due to previous cleanups
+	- Cleaned up excessively long header-search times
+	- Cleaned up excess unwanted textfile outputs generated from 
+		the qmail-bounce searching. A reduction of ~25% has been
+		attained.
+	- Handled Exim bounced email attachments	
+	- TNEF segfault issues cleaned up (see TNEF's CHANGELOG)
+
+Tue Dec 07 2004
+	- PLD:DEV:0102
+		Fixed up Apple double content disposition INLINE issue which
+		could cause ripMIME to try decoding a mailpack for a VERY long
+		time. Thanks to Nicolas MacPherson for the offending mailpack.
+
+
+Wed Dec 01 2004
+	- PLD:DEV:2330
+		Fixed QP decoding error where trailing TABs and spaces were not
+		culled.  
+
+Mon Nov 29 2004
+	- PLD:DEV:1106
+		Fixed possible filename buffer overrun in MIME_decode_encoding() 
+		function where sprintf() was being used to generate the filenames
+		rather than the correct snprintf() call.
+
+
+Sat Nov 27 2004
+	- PLD:DEV:2049
+		Added OLE2 decoding sanity fix (see ripOLE CHANGELOG)
+
+Fri Nov 26 2004
+	- PLD:REL:2238
+		Release as 1.4.0.2
+
+	- PLD:DEV:2028
+		Fixed up ISO decode issues in the headers causing premature
+		truncation.
+
+Sat Nov 06 2004
+	- PLD:DEV:10H27
+		Fixed up numerous unsigned/signed comparison warnings.
+		
+		Fixed up TNEF read_32/_16 functions to allow for error
+		condition returns.
+
+Fri Nov 05 2004
+	- PLD:DEV:22H57
+		Applied Stepan Kasal patches for MIME_decode_b64() 4-char
+		array initization and for the boundary_crash test continue
+		if statement.
+
+
+Wed Nov 03 2004
+	- PLD:DEV:09H48
+		Fixed compiler warning about MIMEH_save_doubleCR "comparison
+		is always false".
+
+Tue Nov 02 2004
+	- PLD:DEV:10H41
+		Added handling for x-mac filename forward-slash separators.
+
+Sat Oct 23 2004
+	- PLD:REL:17H14
+		Release as 1.4.0.1
+
+	- PLD:DEV:16H52
+		Applied patch from Andreas Jobs to fix up situations where the
+		multiple-filenames may not all be correctly hardlinked due to
+		modifications being made via the FNFILTER_filter() calls.
+
+		Many thanks to Andreas for picking up on this.
+
+Mon Oct 18 2004
+	- PLD:DEV:23H08
+		Updated ripOLE code to prevent segfault caused by negative
+		sector values in OLE_follow_minichain()
+
+Sun Sep 26 2004
+	- PLD:DEV:17H27
+		Fixed UUENCODING detection in MIME_headers which would sometimes
+		incorrectly choose UU rather than Quoted Printable.  Thanks to
+		Stepan Kasal for pointing this out.
+
+
+Sat Sep 25 2004
+	- PLD:DEV:21H24
+		Fixed memory leak where the header-info structure's
+		string-stacks file filenames and names were not being
+		flushed after use.
+
+		Fixed accidental flagging of bad headers when a header set
+		contained the same filename in both the content-type and
+		content-disposition headers.
+
+Sat Sep 11 2004
+	- PLD:DEV:23H22
+		Fixed an endless loop in ole.c when dealing with zero length
+		MINIfat reads.
+
+Tue Sep 07 2004
+	- PLD:DEV:21H10
+		Fixed UUENCODED decoding when the UUE filename is specified
+		in the headers (see uuencode.c)
+
+Sun Sep 05 2004
+	- PLD:DEV:09H30
+		Fixed OLE_version() inclusion in MIME_version() when RIPOLE 
+			wasn't defined.  Thanks to Tomasz Klim for noting this.
+
+Sat Sep 04 2004
+	- PLD:DEV:10H47
+		Fixed incorrect return-code propagation from lower recursion
+			levels, causing ripMIME to prematurely terminate some 
+			decoding, thus not seeing some attachments.
+			Thanks to Fred Van Andel for supplying the offending
+			mailpack.
+
+Fri Sep 03 2004
+	- PLD:DEV:09H57
+		Fixed empty-boundary handling (Mailpack sent by Ian Samuel)
+
+Tue Aug 31 2004
+	- PLD:DEV:22H18
+		Fixed up a segfault which could occur while running with 
+		--debug on some emails (See bug #32)
+
+Mon Aug 30 2004
+   - PLD:DEV:20H21
+      Fixed up 'make solib' option (Thanks to Oden Eriksson for 
+				pointing out that it was broken)
+
+Tue Aug 17 2004	
+	- PLD:REL:16H36
+		Released as 1.4.0.0
+
+Mon Aug 16 2004
+	- PLD:DEV:13H43
+		Added strstack objects into the MIME headers struct (hinfo)
+		to track multiple filenames exploits.  When the filename 
+		has been saved to the disk, the additional filenames are 
+		then hardlinked (this prevents excessive disk consumption
+				as hardlinks don't really take up space).
+
+
+Sun Aug 15 2004
+	- PLD:DEV:22H21
+		Added '--verbose-defects' which will dump all the header
+		defects detected during the scanning of the MIME segment
+
+    Decoding filename=attachment.exe
+    Header Defect: Missing separators: 1
+		
+		The number trailing the defect description is the number 
+		of occurances within the headers that the defect occurred.
+
+		Detected defects won't stop the ripMIME decoding by default,
+		instead ripMIME will step around the defects to the best of
+		its abilities and flag the defect register in the hinfo
+		defects[] array.
+		
+
+Wed Aug 11 2004
+
+	- PLD:DEV:23H42
+		Added a new array 'defects' into the hinfo structure in 
+		MIME_headers.h.  The purpose of this array is to track all the
+		defects/mistakes in the MIME headers, allowing the calling 
+		program (of the MIME lib) to make a decision on the mailpack
+		(ie, should defective mailpacks be allowed to pass through).
+
+		More details will be added over the next few days.  This new
+		feature isn't quite ready yet.
+
+	- PLD:DEV:23H22
+		Fixed handling of multiple sequential quotes on filenames and
+		other parameters, ie;
+
+			name=""attachment.exe""
+
+	- PLD:DEV:23H10
+		Added boundary pushing to the stack within MIME_headers in order
+			to catch out situations where multiple boundaries are defined
+			in the headers.
+
+	- PLD:DEV:22H21
+		Changed ISO decoding routine to _not_ convert underscores to 
+			spaces.  This is so that ISO encoded items such as boundary
+			definitions aren't turned into non-valid items, ie
+			__BOUNDARY__ becomes '  BOUNDARY  '.
+
+
+Wed Aug 11 2004
+	- PLD:DEV:18H33
+		Added correct handling of RFC2231 encoded strings;
+			such as:
+			   title*0*=us-ascii'en'This%20is%20even%20more%20
+			   title*1*=%2A%2A%2Afun%2A%2A%2A%20
+				title*2="isn't it!"
+
+	- PLD:DEV:17H10
+		Fixed up handling of multiple atom separators (=,: and ;)
+
+	- PLD:DEV:12H57
+		Added RFC822 comment stripping from headers (while being 
+				processed in the MIME_headers module).  The original
+		headers will be preserved verbatim in _headers_ file.
+
+Mon Aug 09 2004
+	- PLD:DEV:14H48
+		Added --timeout <seconds> feature which allows you to set a CPU
+		seconds timeout.  If the alarm goes off, ripMIME will terminate
+		with an error code of RIPMIME_ERROR_TIMEOUT (5) and leave a log
+		entry (if required).
+
+		This feature is useful to prevent server-load runaway if ripMIME
+		has a problem decoding a particular email
+
+	- PLD:DEV:14H11
+		Added --formdata option to allow the decoding of HTML form
+			data which often contains embedded \0 sequences which cannot
+			be accurately handled by normal email-MIME decoding routines
+			(yet)
+
+Fri Jul 30 2004
+	- PLD:REL:21H06
+		!!!!URGENT RELEASE!!!!
+		Released 1.3.2.3
+
+		There's viruses going around exploiting the ability to hide the 
+		majority of their data in an attachment by using blank lines and
+		other tricks to make scanning systems prematurely terminate their
+		base64 decoding.
+
+		This release fixes that by ignoring consecutive CR checks in the
+		BASE64 data and rather attempting to treat it as a stream of data
+		with arbitary invalid bytes in it.
+
+
+Thu Jul 29 2004
+	- PLD:DEV:23H11
+		Fixed infinite loop with OLE decoding in ripOLE, mailpack supplied
+			by Dallas L. Engelken.   The decoding is not correctly handled
+			at this point (no sensible data can be extracted from the .doc
+			file) but at least ripMIME/ripOLE will not infinately loop.
+
+
+Tue Jul 27 2004
+	- PLD:DEV:12H55
+		Applied filename paranoia patch provided by Marco Ariano
+
+Mon Jul 19 2004
+	- PLD:REL:12H04
+		Released 1.3.2.2
+
+Sat Jul 17 2004
+	- PLD:DEV:14H22
+		Silenced unwanted verbosity from recursion bounds breach report
+			in mime.c:2674
+		Silenced unwanted verbosity from tnef decoder about invalid
+			signature when in non-verbose mode.
+		Silenced unwanted verbosity from ripOLE (see ripOLE CHANGELOG)	
+
+			
+Sat Jul 03 2004
+	- PLD:DEV:14H18
+		libmime-decoders.c:MDECODE_decode_ISO()
+		Fixed situation where ISO encoded string  without a 
+		language page specification would cause the rest of the
+		headers to be truncated from that point; typical example
+		is: 
+			Subject: =??Q?Radiant=20Rubies=20Just=20for=20You.=20SAVE=20$$$'S.?=
+
+			note the =?? rather than say =?iso-9352  etc
+
+		Made the ISO decoder complain about a dud encoding type
+		character if 'verbosity' is on, else, it doesn't report
+		the error (this ensures that things like qmail etc don't
+				get upset)
+
+
+Mon Jun 28 2004
+	- Release as 1.3.2.0
+
+Sun Jun 27 2004
+	- PLD:DEV:15H31
+		Fixed duplication of 'Decoding Filename=' reporting when 
+			decoding a uuencoded MIME segment with the filename
+			defined in the headers.
+
+	- PLD:DEV:14H09
+		Added '--extended-errors' option to allow the turning on of
+			non-fatal errors.
+
+		Corrected various return-code issues
+			#define RIPMIME_ERROR_CANT_CREATE_OUTPUT_DIR 1
+			#define RIPMIME_ERROR_CANT_OPEN_INPUT_FILE 2
+			#define RIPMIME_ERROR_NO_INPUT_FILE 3
+			#define RIPMIME_ERROR_INSUFFICIENT_PARAMETERS 4
+
+	- PLD:DEV:12H15
+		Fixed UUdecode situation where the MIME segment defines the 
+		filename in the headers, rather than the more common case of
+		having a "BEGIN 666 filename" content.
+
+		Thanks to Dallas L. Engelken for detecting this and supplying
+		a suitable mailpack.
+
+Fri May 21 2004
+	- PLD:DEV:13H19
+		Fixed up boundary stack BS_cmp() size compairson check by
+			creating a new function BS_is_long_enough() which takes
+			the length of the line being tested and compares it to 
+			the current 'smallest permissable' boundary.
+
+		Fixed special case boundary situation where the boundary
+			is defined only as '-'.
+
+
+Thu May 13 2004
+	- PLD:REL:14H07
+		Release 1.3.1.2
+
+	- PLD:DEV:00H15
+		Due to the MIME headers alteration, the ISO decoding for filenames
+			started having issues because of gaps in the decoded ISO string.
+			This has now been fixed.
+
+Wed May 12 2004
+	- PLD:DEV:21H57
+		MIME_headers.c:1295; added \t as another possible header line delimiter
+			(along with \n \r and ;)
+
+	- PLD:DEV:21H55
+		Corrected the header unwrapping according to RFC2822 specifications.
+		See comments in MIME_headers.c ~ line 886
+
+Mon Apr 12 2004
+	- PLD:DEV:21H12
+		Fixed up some compile errors on Solaris 9 (char indexes)
+
+Mon Apr 5 2004
+	- PLD:REL:19H38
+		Released as 1.3.1.1
+
+	- PLD:DEV:11H28
+		Fixed TNEF LOGGER call with missing paramter
+
+		Fixed possible underrun in the MIMEH_read_headers() call when trimming
+		off trailing \r and \n chars from the read header line.
+
+		Fixed some LOGGING lines which were not correctly setup with the MIMEH_DEBUG
+		test (resulting in spurilous debugging info when it wasn't desired)
+
+		Added 'smallest stored boundary' (glb.smallest_length) to the boundary-stack
+		module so that it could quickly eliminate a lot of boundary tests based 
+		purely on the size of the input test line.  This also eliminated the problem
+		that would sometimes appear in valgrind where an error in BS_cmp() with the
+		strcmp() call would arise.
+
+		The smallest_length variable can only decriment. Theoretically it could 
+		be reduced to a point where it's value is '1' but it won't affect the 
+		selectivity of the algorithm. The worst case scenario is that smallest_length
+		is set to 1 in which case the algorithm will behave as before the change
+		in the code was made.
+
+	- PLD:DEV:01H59
+		Added header subject initializer into MIME_headers_get() to stop valgrind
+		complaning on certain emails where the subject would not be located in the
+		headers.
+
+		Added more stringent testing of the subject copy-over process in MIME_unpack_stage2
+		after the headers get call.
+
+Sat Apr 4 2004
+	- PLD:DEV:23H54
+		Corrected a segfault when running debug mode and mime.c:2623 logger line
+			was called (didn't have a ,FL at the end)
+		if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_handle_plain:DEBUG: Handling plain email",FL);
+
+		Explicitly called OLE_decode_file_done() after the OLE decode process because
+			sometimes files weren't being closed due to a non-OLE file being opened
+			(hence closing premature of the internal call of _file_done().  It's okay 
+			 to call this function multiple times as it checks all the variables to
+			 ensure that they're not NULL before trying to clean them up.
+
+
+Thu Mar 11 2004
+	- PLD:DEV:12H44
+		Updated man page for 1.3.1.x
+
+Wed Mar 10 2004
+	- PLD:REL:23H59
+		Re-released 1.3.1.0
+
+	- PLD:DEV:23H59
+		Switched all calls (interal) to MIME_unpack() to MIME_unpack_single(),
+			especially for the mailbox handling routine - which would cause the
+			whole system to loop and fail.
+
+	- PLD:REL:08H31
+		Corrected generate-buildcodes.sh where the date stamp might not return 
+		a valid integer.
+
+Tue Mar 9 2004
+	- PLD:REL:01H15
+		Release 1.3.1.0 
+
+		Set --qmail-bounce option to be on by default (appears to be quite stable)
+		and added --disable-qmail-bounce to turn it off instead.
+
+
+Sun Mar 07 2004
+	- PLD:DEV:15H30
+		Dev release.
+
+	- PLD:DEV:13H20
+		Altered UUEncode's error reporting system.  Now when a function returns
+		-1, the calling program should check the global uuencode_error to see 
+		what the error is.  This system is similar to those used with a lot of
+		standard functions like fopen().  The error codes are listed in 
+		uuencode.h
+
+		We needed to do this so that we could return positive-integer error 
+		codes from UUENCODE_decode_uu(), because normally this function will
+		return a positive integer representing the number of files it decoded
+		from the supplied file.
+
+	- PLD:DEV:12H50
+		Corrected mistake with the recursion level passing in MIME_unpack_single_fp()
+		which was passing '0' value to MIME_unpack_stage2(), causing ripMIME to 
+		fail with a segfault when very deeply recursed emails were encountered. NOTE
+		this segfault occurs because of running out of stackspace, not because ripMIME
+		specifically is broken.  ripMIME seems to be able to recurse to about 160
+		levels deep on the test machine before stack failure.
+
+
+	- PLD:DEV:
+		Set MIME_set_header_longsearch() to only take effect if we're calling
+		a plain-text file, ie, being handled by MIME_handle_plain()
+
+Sat Mar 06 2004
+	- PLD:DEV:
+		Unbelievable amount of restructuring required so I could get 2
+		mailpacks with seperate problems to work.
+
+		Improved the discrimination and speed of the BS_cmp() operation
+		by first taking a count of all the numeric+alpha chars in the 
+		boundary and then comparing against the existing boundaries.  This 
+		helps speed things up because there's no longer a string
+		comparison per test if there's not even going to be a chance
+		of a match.  Also, the discrimination is improved because I had an incident where
+		two boundaries existed, with one being a substring of the other,
+		this was passing through ripMIME with the previous 1.3-dev release
+		for some reason.
+
+		A lot of code was removed from the MIME_unpack_stage2() call and placed
+		rather into seperate function calls. The new function calls are;
+
+			MIME_handle_multipart()
+			MIME_handle_rfc822()
+			MIME_handle_plain()
+
+		No doubt more of these will be added over time as I work my way through
+		the old code.
+
+
+
+Fri Mar 05 2004
+	- PLD:DEV:
+		Added a stack system for storing the filenames used during any 
+		given MIME_unpack() call, this means that when the MIME_unpack()
+		call finishes, it doesn't clobber the textfile* files which might
+		have actually been owned by a parent process (as MIME_unpack() is
+				recursive in some situations).
+
+		This addition once more beefs up the size of ripMIME, but is required
+		in order to deal with the ever increasing complexity of emails
+		which are passing through our systems.  The new files are
+			strstack.c
+			strstack.h
+		These two new files are actually adapted/stripped-down versions of
+		the boundarystack files.
+			
+
+	- PLD:DEV:
+		Added a new script to the build process to generate a file called
+			'buildcodes.h'; this file contains the date in UNIX timestamp
+			and human-readable date, along with the output from 'uname -a'
+
+		This has been added to assist mostly in local build checking, but
+		also may serve as a good indicator on other machines to see if 
+		a ripMIME version is absolutely current.
+
+
+Mon Mar 01 2004
+	- PLD:DEV:
+		Corrected misspelling of 'QuotePrintable' to 'Quoted-Printable'
+
+	- PLD:DEV:
+		Updated ripOLE licence to match the ripMIME licence.
+
+	- PLD:DEV:
+		Altered the UUDECODING routine to not complain about lack of
+		permissions on a line which starts with begin but is perhaps 
+		from a plain-text file (ie, not UUENCODED).
+		Suggestion given by Daniel Fraga.
+
+	- PLD:DEV:
+		Removed --syslog_on and --stderr_off paramters from the help dump
+		(thanks to Mat Williams for noticing this). These paramters have 
+		been deprecated for quite a long time.
+
+
+
+Mon Feb 16 2004
+	- PLD:DEV:
+		Added ripmime.1 man file
+
+Sun Feb 08 2004
+	- PLD:DEV:
+		Adding facility to pull out/decode qmail bounced emails - this is
+			against RFC compliance, but people are wanting this badly so I
+			suppose, once again, Microsoft wins (because Outlook seems to 
+					gleefully find the attachments when they should in fact
+					be displayed as verbatim - not decoded).
+
+			use the --qmail-bounce parameter to activate this 'feature'.
+
+	- PLD:DEV:
+		Rolled in a patch by James Stevens to make ripMIME usable for his
+		AV milter tool.  Also included a patch to (for now) split the 
+		MIME_unpack_single() into _single_fp() and _single(), paving the 
+		way for future file-handle based processing rather than FILE *
+
+	- PLD:DEV:
+		Added recursion-maximum level paramter (--recursion-max) as
+		suggested and patch-supplied by James Stevens (some alterations
+				made to the patch)
+
+
+Wed Jan 14 2004
+	- PLD:DEV:
+		Added RCF822 content checking for files generated by the text dump
+			from an UNSPECIFIED encoding/type format.  This allows us to
+			pick out mailpack contents even when there's a set of false
+			headers prior to the real body content (as depicted by the 
+					samples provided by Farit - many thanks ).
+
+Thu Dec 18 2003
+	- PLD:DEV:
+		Updated licence file to correctly indicate the true nature of this 
+		project
+
+Sun Dec 07 2003
+	- PLD:DEV:
+		Completed the 'quiet' functionality
+
+	- PLD:DEV:
+		Fixed up decoding of multiple segment filenames in headers, ie;
+			filename*1="foo";
+			filename*2="bar.";
+			filename*3="exe"
+
+	- PLD:DEV:
+		Corrected handling of */octet content type storage, opting to use
+		RAW decoding rather than plain text.
+
+Sat Nov 14 2003
+	- PLD:REL:
+		Released ripMIME v1.3.0.5
+		
+Fri Oct 30 2003
+	- PLD:DEV:
+		Fixed up decoding issue in stage2 where ripMIME would try to decode
+		a zero-byte file produced from the BASE64 decoder routine.
+
+Fri Oct 23 2003
+	- PLD:DEV:
+		Added integration of the -p <prefix> flag with the --name-by-type
+		flag.  The prefix will only appear on the type-based named attachments
+		if it's explicitly requested (ie, it will not appear if you don't
+				use the -p flag, even though there is a default prefix ).
+
+Thu Oct 23 2003
+	- PLD:DEV:
+		Added --name-by-type feature (as requested by Marcel Manz) to create
+		the filename of an attachment if it has no filename= or name= header
+		based on its content-type
+
+Fri Oct 10 2003
+	- PLD:DEV:
+		Moved house - completely changed everything in my life. 
+		Haven't changed much in ripMIME.  
+		Fixed some Makefile issues and incorrectly included .o
+		files, as reported by Paul Theodoropoulos (thanks!)
+
+Wed Sep 10 2003
+	- PLD:DEV:
+		Rolled in changes from valgrind process.
+		Fixes several potenial segfault situations, especially with ripOLE.
+
+Fri Aug 29 2003
+	- PLD:DEV:
+		Fixed mailbox decoding from STDIN
+
+Thu Aug 28 2003
+	- PLD:DEV:
+		Changed the mime-headers output path setting to be set from within
+		the MIME_unpack() call, rather than allowing it to be set externally
+
+		Prior to this change, doubleCR files were being saved in places like
+		the root directory and other unsavory locations.
+
+		ripOLE library updated - segfault fixed when reading miniFAT with a 
+		negative start sector value
+
+Sun Aug 24 2003
+	- PLD:DEV:
+		Fixed up situations where an embedded email with an attachment
+		filename (As apposed to just raw embedded with RFC822 content-type)
+		could not be decoded (would be passed over and ignored).
+
+		Thanks to Ricardo Kleemann for supplying a sample mailpack.  On
+		fixing up for this one mailpack, my test suite jumped from decoding
+		1092 attachments to 1193 attachments.
+
+
+Wed Jul 16 2003
+	- PLD:DEV:
+		LOGGER % filtering solution fixed
+
+	- PLD:DEV:
+		Bundled in the ripOLE engine into ripMIME, this means that 
+		ripMIME can now extract files which have been included in an
+		MS Office file.  Currently ripOLE cannot extract attachments
+		which have been embedded directly into the WordDocument stream
+		data however (this is usually Images and some sound files). 
+		However it does successfully get most/any files which were
+		included using Insert->File
+
+		Added --no-ole option to make ripMIME not decode OLE files.
+
+Mon Jun 30 2003
+	- PLD:DEV:
+		Added libripmime build ability, allowing developers to use
+		#include "ripmime-api.h" and then link with libripmime.
+
+Sun Jun 22 2003
+	- PLD:DEV:
+		Fixed QuotedPrintable end-of-string decoding 1-off char error
+		which would cause ripMIME to complain that it ran out of data
+		because it was comparing "if (ip < slen -2)" when it should have
+		been comparing to slen -1  (because the '<' implies a -1 by 
+				default )
+
+		Thanks to Paul Theodoropoulos for his submissions of mailpacks
+		which have greatly assisted in locating these obscure errors.
+
+
+Sat Jun 21 2003
+
+	- PLD:DEV:
+		Fixed UUdecode false-positive hit in UUDECODE_is_uuencode_header()
+			(thanks to Bernard Fischer once more for supplying a mailpack
+			 which demonstrated the fault and for providing a patch )
+
+	- PLD:DEV:
+		Added an explicit RFC822 decoding routine into MIME_unpack_stage2()
+		because a supplied mailpack which had multiple documents, all in
+		individually wrapped RFC822 attachments caused ripMIME to incorrectly
+		interpret the segment, till the end of the mailpack as the entire 
+		RFC822 message ( consequently, the recusion limit would eventually
+				kick in and exit ripMIME ).
+
+		By placing an explicit detection into _unpack_stage2(), the problem
+		has been eliminated without affecting the decoding accuracy of other
+		mailpacks.
+
+Wed Jun 18 2003
+	- PLD:DEV:
+		Relaxed the base64 decoding standard to allow for a possible single
+		blank line within the B64 stream.  This has been needed because there
+		are some rare mailpacks produced by [obviously] broken agents which
+		have spurilous blank lines amongs the data-stream ( but are terminated
+				by boundaries )
+		
+		I feel this is a really ugly way to deal with this problem - people 
+		should really make their B64 encoders conform to realistic standards
+		rather than hoping that all the decoders will pick this up accurately
+
+		I would have left out the CR sensitivity entirely - except that there
+		is another example mailpack I have where [incorrectly] there is plain
+		text after the B64 stream has ended ( incorrectly inserted disclaimer
+				no doubt ).
+
+		I may revoke this relaxation if it can be found that the 'other' example
+		mailpack is in fact interpreted [wrongly] by all other MUA's.
+
+		Update - both mailpacks are correctly decoded by Sylpheed :-\
+
+Sun Jun 15 2003
+	- PLD:REL: Released 1.3.0.4
+
+	- PLD:DEV: Corrected UUdecoder path issues, causing UUencoded attachments
+		to sometimes be missed from decoding
+
+Sat Jun 07 2003
+	- PLD: Corrected misinterpretation of the return result from uuencoded_decode
+		where mime.c was propergating the return result into the _decode_stage2()
+		calls, causing processing of the mailpack to prematurely halt.
+
+		Thanks to Jiri Kucik for submitting the offending mailpack.
+
+
+Fri May 09 2003
+	- PLD: Attempting to clean up the handling of % symbols in filenames
+		and their output via the LOGGER_log() call.  Normally they used
+		to be converted into %% pairs so that the final printf type call
+		would not try and interpret the % as a positional identifier.
+		---still in work.
+
+Tue May 05 2003
+	- PLD: Added NULL test for filename reporting callback in mime.c
+		Without this NULL test, other applications using the mime module 
+		could fail if they did not have the callback function set to
+		their own.
+
+Sat May 03 2003
+	- PLD: Added Content-Transfer-Encoding 'binary' to ripMIME, which
+		causes ripMIME to interpret the data the same as 'raw'.
+
+Fri May 02 2003
+	- PLD: Added --no-mht switch, disables the decoding of MHT files
+		(A microsoft 'combined' WWW-page-in-email sort of format)
+
+Wed Apr 30 2003
+	- PLD: X-men 2 at theaters
+	- PLD: Added option-usage for --no-tnef
+	- PLD: Enhanced pldstr module to provide string search/replace
+		functionality and case-insensitive strstr
+	
+Sun Apr 27 2003
+	- PLD: Pushed global variables into singular global struct for 
+			boundary-stack module
+
+	- PLD: Optimised the boundary-stack BS_cmp() call so that it will
+		only do strcmp calls (rather than strstr()) for the first  N
+		characters, where N is defined by BS_BOUNDARY_DETECT_LIMIT_DEFAULT
+		and consequently, BS_set_boundary_detect_limit().  
+
+		Currently the default is set to 4 characters, I do not know of
+		any mailpacks out there which are using more than the 'defacto'
+		'--' prefix to the boundary to seperate MIME sections
+
+	- PLD: Added extra parameter to the BS node, to store the length
+		of the boundary, saves processing time later when comparing
+		boundaries in BS_cmp()
+
+	- PLD: Corrected DoubleCR decoding issue in UUENCODE_decode_uu()
+
+	- PLD: Fixed ranging error in filename renaming method selector
+		(MIME_set_renamemethod)
+
+	- PLD: Activated the --no-quotedprintable option.  This will stop
+		ripMIME from attempting to decode/decypher attachments which have
+		been QuotedPrintable encoded (some forwarded emails are encoded
+			like this )
+
+	- PLD: Added a small cleanup function for after BASE64 decoding.
+		Normally when BASE64 decoding finishes there's often a single
+		line left before the next boundary, this typically has been 
+		written out as a textfileXX file.
+
+		The additional function absorbs this data [and discards].
+
+		This also should improve [ a little ] the performance as ripMIME
+		will not have to go through the entire header-reading/parsing/
+		decoding process each time.
+
+Sat Apr 26 2003
+	- PLD: Dropped a lot of old code which was residing in MIME_headers
+		for the sake of 'rollback' in the event that the new header
+		parsing code didn't work.
+
+Sat Apr 19 2002
+	- PLD: Added fixes for VCARD/UUENCODE detections thanks to Bernard
+		Fischer.
+
+Sat Mar 29 2003
+	- PLD: Added better handling of the apple-double encoding, now when
+		and attachment is decoded, it'll be decoded into 3 parts (overall)
+		1. mac-FILENAME : This usually contains nothing and can be ignored.
+				The file is saved in the event [for what ever reason] that data
+				or text was placed at the start of the apple-double attachment
+				pair [ Similar in a way to the potential presence of data at the
+				beginning of a MIME encoded email, which usually says "This email
+				is encoded with MIME".
+
+		2. FILENAME.applemeta : This is the metadata associated with the original
+				attachment
+
+		3. FILENAME : This is the actual file/attachment
+
+Fri Mar 28 2003
+	- PLD: Release
+	- PLD: Replaced header parsing code with one which follows the 
+		'standards' compliant structures ( while still looking out for
+		various exploits ).  This new parsing code will open the way
+		for better information passing [back] to programs using the ripMIME
+		API. Also, the new header code improves the false-positive rate with
+		filenames.
+
+	- PLD: More intelligent support for the Macintosh Applefile format, which
+		uses a two 'file' approach for sending files ( meta data file and data
+				file ).  Now, any mac files will have their applefile-metadata
+		stored as 'applefile_*'.  Although this is not yet perfect, it at least
+		ensures that the real data file is correctly saved with the right name.
+
+
+Thu Mar 20 2003
+	- PLD: More typos in the LOGGER_log() calls fixed up
+
+	- PLD: Removed the functions MIME_set_nouudecode() and UUENCODE_set_nodecode()
+		because they were 'confusing' due to inverted logic, additionally it brings
+		the functions inline with all the other modules which use _set_decode()
+		to [en/dis]able the decoding process.
+
+Wed Mar 19 2003
+	- PLD: Corrected several search-replace messups from original conversion
+		to running everything under LOGGER.  
+
+	- PLD: Added facility to report filename decodings from within the various
+		decoding modules (TNEF and UUENCODE at this point) so that the reporting
+		function can be defined from the calling application.  If no callback
+		is provided, the modules will default back to a very basic 1.2.x format.
+
+
+Mon Mar 17 2003
+	- PLD: Emergency release of 1.3.0.2
+
+	- PLD: Fixed major bug in the MIMEH_headers_read() call which would 
+		cause the first line of the headers to be overwritten by following
+		lines ( in memory ) - Ultimate effect of this is that several files
+		would not be decoded because the vital file information would be
+		lost.
+
+	- PLD: Unified logging output across all modules
+
+	- PLD: Fixed space retention on header-wrapped filenames ( again
+			thanks to Kees Damen for providing a suitable mailpack )
+
+Fri Mar 14 2003
+	- PLD: Fixed linewrap filename issues in headers ( thanks to Kees Damen
+		for pointing this issue out ).
+
+	- PLD: Fixed 0 length string issue with PLD_strncpy and replaced 
+		existing algorithm with a more robust one as provide by 'Defrost'
+
+	- PLD:  Rolled in unified pldstr module which replaces strlower,
+		XAM_strtok and zstr.
+
+	
+Sat Mar 01 2003
+	- PLD: Patched parameter parsing code to allow it to accept non-space
+		seperated parameters, ie, -d/tmp ( Patch supplied by Bernard Fischer )
+
+Sat Feb 22 2003
+	- PLD: TNEF: Corrected pointer clobbering on 64-bit systems in TNEF decoding,
+		and added memory allocation free'ing.  Both patches submitted by
+		Bernard Fischer and adapted by PLD
+
+Thu Feb 19 2003
+	- PLD: Fixed content-type 'trailing' issue causing ripMIME to report
+		the previous content-type if the new attachment headers did
+		not contain a content-type. ( Mailpack contributed by Bernard Fischer )
+
+Wed Feb 19 2003
+	- PLD: Converted command-line options to use hyphens '-' rather 
+		than underscores '_' for word seperators.  NOTE, the old
+		underscore seperators will still work but they are considered
+		depricated.
+
+	- PLD: Added multiple additional verbosity options:
+		--verbose-oldstyle : Output information in the format
+			used from the 1.2.x series of ripMIME
+		--verbose-contenttype : Output content-type information
+			of each file decoded ( Contributed by Thomas E Dell )
+
+	- PLD: Introduced a new verbose information format for file details.
+		The new format uses name=value pairings for the output, this
+		allows parsers to easially decode the output into useful data
+		if need be.  An example of the output is now:
+
+		Decoding content-type=text/html filename=foobar.html
+
+		Currently only 'content-type' and 'filename' are reported but more
+		options will most likely be added in the future.
+		
+
+	- PLD: Commenced v1.3-dev development.
+
+
+Fri Feb 07 2003
+	- PLD: Released as 1.2.17.0 ( This is the last 1.2.x release, we
+		will now move to 1.3-dev and 1.4-stable releases
+
+Thu Feb 06 2003
+	- PLD: Corrected testing conditions of the name= substring to test for
+		both a space OR a ';' (semicolon) in order to accept the value
+		after the 'name=' as being a filename.
+		(Thanks to Marc Bleuwart for the supplied mailpack exhibiting this
+		issue )
+
+Wed Feb 05 2003
+	- PLD: Added total BASE64 decode line count output for failed decoding
+		operations when in --debug mode
+
+Sat Feb 01 2003
+	- PLD: Corrected some *_init() calls and *_set_verbose() as well as
+		*_set_debug().
+
+	- PLD: Broke down the mime.c file into some smaller modules:
+		boundary-stack.[ch] - Handles the boundary string ordering for
+			the mailpack decoding.
+
+		filename-filter.[ch] - Performs basic filename sanity / paranoia
+			checking.
+
+		uuencode.[ch] - A bit of a misnomer, this module currently deals
+			with the detection and decoding of uuencoded data.
+
+	- PLD: Merged 3 string handling modules into one.  While this seems to go
+		against the flow against the move to modularise the mime.c file
+		it is better to have the files XAM_strtok, zstr and strlower all
+		merged as they are all part of the same family of strings handlers.
+
+	- PLD: Moved ISO decoding to directly after all the headers have been read
+		and a "true blank" has been received.  This way we do not have to
+		worry about decoding the individual components of the headers, rather
+		they are presented in an already decoded form when the calling program
+		gets back the header pointer.
+
+Fri Jan 31 2003
+	- PLD: Reordered the MIME_decode_filename() function so that it attempts to
+		decode ISO filenames -before- any paranoia filters are applied.  This
+		is because certain BASE64 characters ( ie / ) are interepreted as
+		paranoid invoking characters, thus are stripped from the filename 
+		before ISO decode gets to use them.
+
+		Thanks to Michal Perchel for supplying the mailpack exhibiting this
+		property.
+
+
+Tue Jan 28 2003
+	- PLD: Replaced MIME_read() fgetc/fputc calls with a fread/fwrite binary
+		functions to prevent ripMIME from terminating its file/stdin reading
+		too soon if it received an EOF character.
+
+Mon Jan 27 2003
+	- PLD: Corrected segfault in parameter parsing if the last parameter was 
+		a -d, -i or -p.  Whole parameter parsing block moved to its own
+		function.
+
+	- PLD: Replaced scandir() calls in mime.c ( for post-decode cleanup ) with
+		opendir()/readdir() - Solaris ( and possibly other OS's ) have 
+		different implementations of scandir() compared to Linux/BSD
+
+	- PLD: Silenced several messages in MIME_headers and MIME tnef decoding which
+		were appearing despite having -v selected
+
+Sun Jan 26 2003
+	- PLD: in MIME_decode_filename(), removed limitation of filenames only having
+		a space character and lengths greater than two (2).
+
+	- PLD: Corrected header unfolding in MIMEH_read_headers()
+		This rectifies the situation where some filenames are cropped because they
+		were spread over two lines in the headers.
+
+	- PLD: Moved ISO decoding functions and QuotedPrintable functions into a new
+		module called 'libmime-decoders'.  
+
+	- PLD: Initialised encoding_type in the ISO decoding routines in order to 
+		silence some compilers about a 'usage unitilised' warning.
+
+	- PLD: Corrected situation where an attempt to extract a file name would
+		be misled due to a substring 'name' appearing anywhere within headers.
+
+		Narrowed down the conditions required in order for a 'name' word to appear.
+		This corrects the issue as reported by Chris Hine
+
+	- PLD: I've sorted out the Quoted-Printable decoding
+		issues.  Who would have thought such a relatively simple 
+		decoding process could cause so much pain.  As a consequence
+		some of the prior 'patches' have now been removed as they are
+		no longer needed. ( removed patches: Mirko Buffoni )
+
+Sat Jan 25 2003
+	- Planning on releasing as 1.2.17.0
+
+Fri Jan 24 2003
+	- Created a new function to handled decoding of ISO encoded strings, now called
+		MIME_decode_ISO().  This function is used by MIME_decode_filename() and
+		will also be used by any programs wanting to decode other ISO encoded strings
+		such as email addresses and such.
+
+	- Removed MIME_init_hexconv() call ( which previously setup the BASE64 conversion
+		matrix - but we now have a compile-time static array setup for that )
+
+	- Renamed 'quick_clean_filename()' to be MIME_filename_paranoid_filter()
+		which is called from within MIME_decode_filename()
+
+	- Renamed MIME_clean_MIME_filename() to MIME_decode_filename() as its
+		primary function is mostly to handle ISO decoding as well as path
+		prefix stripping.
+
+	- Deprecated --no_paranoid and rather added in --paranoid. 
+		Setting --paranoid on will result in any high-ascii
+		characters to be set to _'s
+
+	- Changed void return value of quick_clean_filename to 'int'
+
+	- Added testing of '=' char prior to a ? for testing presence of
+		an ISO encoded filename in MIME_clean_MIME_filename()
+
+	- Added functional handling of ISO encoded filenames in headers
+		( see MIME_clean_MIME_filename() ).  Still need to merge
+		the functions of MIME_clean_MIME_filename() and quick_clean_filename()
+
+Wed Jan 22 2003
+	- Corrected functioning of --no_nameless operations.
+
+Tue Jan 21 2003
+	- Added trailing \n break after decoding a QuotedPrintable line
+		(submitted by Mirko Buffoni )
+
+
+Mon Dec 16 2002
+	- Corrected soft-break decoding of Quoted-Printable encoded data
+
+Tue Nov 12 2002
+	- Released as 1.2.16.21
+	- Updated FFGET module to 1.0.0.3 release - fixes garbage-end
+		problem with some BASE64 decodes which don't terminate
+		their data with a \n[\r]
+
+Sat Nov 09 2002
+	- NOT-RELEASED (internal use only, see 1.2.16.21)  1.2.16.20
+	- Changed the strlower() function to use unsigned char rather
+		than signed char, this allows for non-ASCII conversions
+		on the tolower() call without breaking (ie on non-english
+		character sets)
+
+Wed Nov 06 2002
+	- Released as 1.2.16.19
+	- Added a patch from Phil Brutsche to deal with space-embedded
+		filename, name MIME fields.
+
+
+Fri Oct 11 2002
+	- Corrected segfault when a filename with a \" ending was encountered
+	- Cropped filenames with ? in them which are NOT ISO encoded to only
+		include the part before the ?
+
+Thu Oct 10 2002
+	- Updated the logger file which contained a segfault issue
+		when sending a string containing a % symbol to syslog.
+	- 
+
+Wed Jun 26 2002
+	- Added MIME-headers save-file closing function. This prevents
+		a segfault when MIME_unpack() is called multiple times
+		within the same program.
+
+Fri May 31 2002
+	- Release as 1.2.16.16
+	- Fixed same issue for Double-CR saved files
+	- Failure to prefix the unpackdir onto the recursive decoding of 
+		mailpacks extracted from within mailpacks (ie, EML files) caused
+		extractions to directories other than the present-working-dir to 
+		fail [partially] due to not being able to locate the newly created
+		/ extrated mailpack.
+		
+		That teaches me to 'ignore' the warnings that were popping up in my
+		syslogs about 'Cannot locate file'.
+		
+		
+Sun May 26 2002
+	- Release as 1.2.16.15
+	- bug causing ripMIME to enter into an infinite loop if the boundary
+		contained the phrase "boundary=" within it.  Thanks to
+		Steffen Clausjuergens for supplying the mailpack exhibiting
+		this defect!
+
+Sat May 25 2002
+	- Release as 1.2.16.14
+	- Minor bug in FFGET_raw() causing missing of decoding due in 
+		mailpacks which have mixed EOL definitions, ie, the 
+		email uses \n only in the main headers, but then switches
+		to \r\n in the bodies [ Can someone /PLEASE/ tell me why
+		any peice of email software would do this !?!? ]
+
+Wed May 22 2002 
+	- Release as 1.2.16.13
+	- Corrected block-boundary read line error with FFGET_fgets()
+	- Corrected segfault error with UUDECODE due to XAM_strtok() 
+
+Sun May 12 2002 (Mothers Day - Be nice to your mother and take the day off
+		from IRC'ing or sufing the net)
+
+	- Release 1.2.16.12 .... one day I'll release 1.2.17.0
+
+	- Improved nested decoding.  There was a very strange size-specific
+		decoding mishap which was causing some packs to unpack 
+		flawlessly, others to fail, with the only difference being that
+		one had more than 1089 bytes of headers. Cleaning up the memory
+		leak issues resolved it.  Though I'm always a bit fearful of
+		such dissapearing bugs.
+
+	- Cleaned up memory free'ing, used 'ccmalloc', nice little tool
+		I recommend it to people trying to at least get a coarse
+		view of what is being left out. I found that simply by fixing
+		up the memory leaks I had, one of my "wierd" bugs went away
+		very nice of it.
+
+Tue May 07 2002 pldaniels@pldaniels.com
+	- Added new function to MIME_headers object, to return the
+		current status of the headers save status. This allows
+		us to prevent opening up multiple FILE *'s on the same
+		named _header_ file, potentially causing corruption
+	- Removed the "WARNING: Possible pointer size being sent" debugging
+		message.
+
+Tue Apr 30 2002 pldaniels@pldaniels.com
+	- Updated TNEF with patch supplied by Joe Gooch (Thanks Joe)
+		corrects segfault when decoding certain TNEF's.
+	- Added new function in FFGET.  FFGET_set_watch_SDL() tells FFGET
+		to either be watching out for ^M^M sequence, or not to
+		(1, 0 respectively).  This is required so that we can 
+		prevent ripMIME from interpreting the ^M^M sequence if it's
+		found in the email BODY as a SDL-Outlook exploit.
+		Thanks to Elio de Santi for the mailpack which revealed this
+
+Fri Apr 26 2002 pldaniels@pldaniels.com
+	- Lots of fixes in the FFGET routines. Including the introduction
+		of a two-stage FEOF status.  Initially we mark that we've
+		reached the end of the /real/ file by flagging FILEEND, 
+		then, when we actually try to read a new data block using
+		FFGET_getnewblock() we flag FFEOF.  Previously we'd flag
+		FEOF too early. This would cause corruption of various 
+		attachments.
+
+Tue Apr 23 2002 pldaniels@pldaniels.com
+	- corrected memory leak causing "Killed" messages on large 
+		mailpacks with lots of text/print-quotable attachments
+Mon Apr 22 2002 pldaniels@pldaniels.com
+	- Re-tuned the UUencode line detection sequence.  If anyone is
+		aware of a /precise/ method to detect a uuencoded attachment
+		in mailpacks, both as RFC and Outlook[stupid], please email
+		me on pldaniels@pldaniels.com
+
+Fri Apr 19 2002 pldaniels@pldaniels.com
+	- Corrected FFGET_fgets() function which was returning NULL 
+		one call too early.  Rather than sending back the last
+		"partial" line read (end of buffer), it would assign
+		the data to the buffer, but also return NULL, which 
+		caused some programs to exit early from their reading
+		loops.
+		
+		I'm actually quite surprised things even worked with
+		this error... amazing what can slip by.
+
+
+Sun Apr 14 2002 pldaniels@pldaniels.com
+	- Corrected _headers_ file output location, which was defaulting
+		to the execution dir, rather than the unpackdir
+
+Fri Mar 08 2002 pldaniels@pldaniels.com
+	--Released as 1.2.16.6
+
+	- Added ability to decode "x-uuencode" files even though this
+		type technically is not specified by the RFC's (one 
+		should be using BASE64 or QuotedPrintable.
+
+	- Corrected UUencode filename extraction from the header 
+		triple
+
+Thu Mar 07 2002 pldaniels@pldaniels.com
+	--Released as 1.2.16.5
+
+	- Fixed XAM_strtok() call which was occasionally failing if
+		there was a delimeter at the end of the string.
+
+Wed Mar 06 2002 pldaniels@pldaniels.com
+	- Renamed zstrncpy.[ch] as zstr.[ch] as it's becoming a generic
+		library with more than just the zstrncpy function in it.
+		It now contains the zstrncat and zstrncate calls
+
+Tue Mar 05 2002 pldaniels@pldaniels.com
+	--Released as 1.2.16.4
+	
+	- Replaced all strncpy and strcpy routines with zstrncpy() calls.
+
+
+Sun Mar 03 2002 pldaniels@pldaniels.com
+	--Released as 1.2.16.3
+	
+	- Replaced file write routines in BASE64 and UUDEC decoders so that they
+		use buffered write (reduces the number of fwrite() calls. This
+		also gained another 10% of performance over direct write.
+
+Sat Mar 02 2002 pldaniels@pldaniels.com
+
+	- Replaced in MIME_base64_decode() the FFGET_fgetc() call with a direct 
+		source code from the FFGET_fgetc() routine. Whilst this does mean
+		that I will have to keep track of the changes I make in FFGET_fgetc
+		and ensure that I port them across to the BASE64 decode routine, it
+		does make for a good 10% gain in performance as shown on a 80Mb data
+		test suite.
+
+	- Converted Base64, Hexconv and UUDEC routines into static (compile time)
+		fixed tables so that there isn't any need to build them each
+		time the program is run. This saves us on startup time, although
+		minimal, it does help.
+
+Thu Feb 28 2002 pldaniels@pldaniels.com
+	- Released as 1.2.16.2
+	- Updated FFGET routines with patch as supplied by J.Gooch
+	
+Tue Feb 26 2002 pldaniels@pldaniels.com
+	- Moved to 4 digit version numbers
+
+	- Added f->FFEOF = 0 to the ffget_set_stream function.  Was causing
+		an intermittent FEOF() status based on random data without
+		it being there.
+
+Sat Feb 23 2002 pldaniels2pldaniels.com
+	- Committed ripMIME to local CVS
+
+Wed Feb 20 2002 pldaniels@pldaniels.com
+	- Releasing as v1.2.16
+	- Cleaned up FFGET routines and added more comments.
+	- Added new DEBUG mode selection routines.  Now debugging can be
+		activated on a per-level basis, with (default) now there being
+			*_DNORMAL == Debug normal
+			*_DPEDANTIC == Pedantic debugging (lots of output)
+
+		ie, in mime.c, there is now lines like
+
+			if (MIME_DPEDANTIC) fprintf(stdout,"%s",line);
+
+		This replaces the existing non-level sensitive routines of
+
+			if (_MIME_debug) ....
+
+
+	- HUGE stuff up.  Non-quotedprintable encoded text files were not
+		being written out because I accidently left out the fprintf
+		statement in MIME_decode_text() routine... REALLY bad MISTAKE.
+		This was causing text files to be written out as 0-byte files.
+
+		Fortuntely this error was picked up by the Xamime testing suite.
+
+	- Releasing as v1.2.15 (I wonder if these releases will stop coming
+		out so quickly)
+
+	- _FINALLY_ fixed TNEF decoding, many thanks to Chea Chee Keong
+		for the help provided, very valuable.
+
+	- Releasing as v1.2.14
+
+	- FEOF detection mishandling in MIME_decode_uu() cleaned up (uses
+		the FFGET_feof() call rather than feof(), which (the feof)
+		could prematurely return TRUE rather than when FFGET returns
+		true, this is due to the fact that the FFGET routines will
+		(on the last valid read) read up to the end of the file causing
+		feof() to return TRUE, however, until all the data is read out
+		of the FFGET buffer, it should not return true.  Hence, all
+		routines using feof() were replaced with FFGET_feof()
+
+Mon Feb 18 2002 pldaniels@pldaniels.com
+	- Releasing as v1.2.13
+
+	- CRCR logic cleaned up in FFGET_fgets() (thanks to Joseph Gooch for
+		his help in resolving the logic routines)
+	- Initialisation of ungetc flag in FFGET
+	- Removed MIME detection debugging output
+	- Added anti \0 poisoning filtering
+
+Sun Feb 17 2002 pldaniels@pldaniels.com
+
+	- Releasing as v1.2.12
+		Although I've not had a chance to verify that ripMIME extracts all
+		the possible \r explioits which can be used against Outlook/Express
+		I am certainly confident it can extract most of them.  I've ran this
+		ripMIME against about 600Mb of normal emails, all of which have extracted
+		correctly in regression tests.
+
+		I'm _STILL_ seeking more assistance to deal with TNEF decoding.  I have
+		one mail pack which refuses to correctly extract, rather it results in
+		the TNEF routines attempting to access data beyond the limits of the file
+		(yes, it's protected against that, but it's still annoying!)
+
+	- Added FFGET_fgets() true blank detection for reads, this is to
+		deal with potential trickery as mentioned in bugtraq regarding
+		fgets() falsely returning a single \n as though it was a blank line
+		when really, it was just the previous fgets didn't have enough
+		buffer space to include the last \n.
+
+	- Corrected file Unique Nameing name cropping.
+
+Fri Feb 15 2002 pldaniels@pldaniels.com
+
+	- Made ripMIME report its version via STDOUT instead of STDERR
+
+	- Changed "Decoding TNEF format" report to report to STDOUT instead
+		of STDERR
+
+	- Replaced entire file I/O routines to use FFGET, which now supports
+		fgets(), fgetc() and raw-get routines.  This was done so that we
+		could (originally) detect the presence of an offending <CR><CR>
+		double byte in the headers of some emails which may be used to
+		exploit Outlook's interpretation.
+
+	- Fixed zstrncpy which was copying one byte too few when a strncpy
+		was done.  This was causing filename crop problems. -NOTE- this
+		was primarily due to the fact that the size of buffer specified
+		was inclusive of the \0 terminator.... as apposed to an actual BUG
+
+	- Added into MIME_headers the ability to decode "Content-Location"
+		to extract filenames from the new Microsoft MHF formatted emails
+		(basically it's a bundled together WWW page HTML + images)
+
+Thu Feb 14 2002 pldaniels@pldaniels.com
+	- Added header detection of double CR exploit usable against
+		MS Outlook (This feature is more of use to programs which
+		actively filter against exploits such as Inflex/Xamime
+
+	> Need more help with TNEF decoding!!!!!
+
+Wed Jan 30 2002 pldaniels@pldaniels.com
+	- v1.2.11
+	- Added ability to decode MULTIPLE UUEncoded attachments within the
+		same body of text.
+
+Tue Jan 29 2002 pldaniels@pldaniels.com
+	- v1.2.10
+	- Corrected mistaken use of 'n' count in UUdecode byte count resulting
+		in excessive sized files (with useless data)
+	- v1.2.9 released
+	- Removed non-used functions MIME_getchar() and MIME_insert_X_header()
+	- Added UUDecode routines
+	- Added --no_uudecode option
+
+Mon Jan 28 2002 pldaniels@pldaniels.com
+	- v1.2.8 released
+
+	- Patch suppled by Tim J. Robbins for buffer-smash as specified by
+		BugTraq applied
+Thu Nov 15 2001 pldaniels@pldaniels.com
+	- Corrected potential buffer overrun situation in raw-decode mode
+	- Corrected buffer overrun with MIME_headers which allowed massive
+		sized filenames to cause segfaults (Thanks to Tristan Aston
+		for bringing this to my attention)
+	- Various code cleanups and extentions to the mime.[ch] files to
+		deal with new advances in Xamime (http://xamime.com)
+
+Fri Nov 09 2001 pldaniels@pldaniels.com
+	- Replaced several sprintf()'s with snprintf
+	- Set a global _MIME_STRLEN_MAX length to 1023 and used
+	 	with snprintf() to avoid buffer-overflows as reported by
+		Tristan Aston (Solaris 8).
+	-
+Mon Nov 05 2001 pldaniels@pldaniels.com
+	- Resolved TNEF segfault issue with some winmail.dat packs which do
+		not seem to conform to the standard which we have for the current
+		tnef decoding module.  Some winmail.dat packs still dont unpack
+		but that's an issue with the MAPI data I believe (anyone want to
+		help?)
+	- Added "RAW" format for encoding, RAW basically is a slower form of
+		read/decode, but, it will at least correctly (??) save non-format
+		specified files.  RAW decoding routines are kept in rawget.[ch]
+		which is nothing more than a specific version of fgets().  This may
+		change later [back to fgets()].  The difference is that rawget
+		returns how many bytes it read, because the data returned by a
+		binary file may contain \0's which would otherwise fool length
+		testing function calls (ie, strlen()) into indicating there are
+		less bytes than what there really is.  This could be resolved by
+		performing a test for the \n or \r, but it's more overhead.
+	- Added patch from Xerox to correct occasional issue with non
+		constant BASE64 line lengths (previously used to determine when
+		the encoding had finished)
+
+Fri Oct 26 2001 pldaniels@pldaniels.com
+	- 1.2.5 released
+	- Removed mailbox "\n\rFrom " line detection routines out of text
+		decoding section, created new function MIME_unpackmailbox()
+		which will break apart the mailbox email at at time and feed it
+		to MIME_unpack()
+	- [mime.c, tnef.h, tnef.c ] Fixed issue with TNEF decoding segfaulting
+		if -d param was used in ripMIME
+	- [config.h] Cleaned up the __BYTE_ORDER mangling issue by renaming
+		as __TNEF_BYTE_ORDER
+	- Added numerous debugging messages available by using --debug on
+		ripMIME
+	- [tnef.c] Removed extensive deadcode from tnef modules
+	- [tnef.c] Removed compressed RTF decoding
+	- Improved error reporting and messages
+
+Thu Oct 18 2001 pldaniels@pldaniels.com
+	- 1.2.4 released
+	- Added TNEF decoding ability through use of modified tnef2txt
+  		library as created by Brandon Long (blong@uiuc.edu), April 1997.
+		As yet, I have not been able to successfully contact this person.
+
+
+Tue Oct 09 2001 pldaniels@pldaniels.com
+	- Updated MIME Boundary stack "cmp" operation so that it pops off
+		any boundaries -above- the detected one.  This is because
+		technically, all boundaries should be nested in their occurances.
+		This is a hoped fix for most of the .eml attachment extraction
+		problems that were occuring.
+
+Tue Sep 11 2001 pldaniels@pldaniels.com
+	- Cleaned up source and added in more comments
+	- Released v1.2.3
+
+Mon Sep 10 2001 pldaniels@pldaniels.com
+	- changed the detection string for quoted-printable from
+		"quote-printable" to "quoted-printable".  A small, but oh so
+		painful mistake!
+	- changed boundary line detection in header files to improve the
+		detection and extraction of multiply-nested mailpacks
+
+Sun Sep 9 2001 pldaniels@pldaniels.com
+	- Improved name= parameter discrimination when headers have mixed in
+		<META ... name="..."> components.  Now correctly decodes name= when
+		the headers have a <ID 23523535255> type identifier.
+	- Changed XAM_strncasecmp and strlower to use inline/macro version of
+		isupper / tolower
+
+Wed Aug 29 2001 pldaniels@pldaniels.com
+	- Added ability for ripMIME to uncompress BASE64 encoded inline
+		mailpacks (these are like forwarded emails, but they've been
+		coded up in BASE64 format! I kid you not!)
+
+	- Added Handling for Quoted-Printable filenames
+
+Fri Aug 24 2001 pldaniels@pldaniels.com
+	- Added recursive calling if mailpack contained encoded mailpack
+		ie, when we get a named rfc822/message type attachment.
+
+	- Inserting new code from MIME_headers.[ch] which will do explicit
+		analysis of the headers in a single-line stream format. Makes
+		things far far easier to deal with later.
+
+Tue Aug 21 2001 pldaniels@pldaniels.com
+	- mime.c: added explicit handling of mailbox format (/var/spool/mail)
+
+Fri Aug 03 2001 pldaniels@pldaniels.com
+	- mime.c: added --no_paranoid option for filename filtering
+
+Wed Aug 01 2001 pldaniels@pldaniels.com
+	- mime.c: MIME_test_uniquename(): used strrchr rather than XAM_strtok()
+		to locate the last '.' seperator for filenames. Fixes problem with
+		misnaming of multiple .'d filenames.
+
+Tue Jul 31 2001 pldaniels@pldaniels.com
+	- XAM_strtok.c: Corrected end-of-tokens bug in XAM_strtok(), would
+		return a null string when it should return the remainder of the
+		string.
+	- mime.c: added additional method for renaming of file
+			--prefix
+			--infix
+			--postfix
+	- mime.c: added "--unique_name" function to preserve existing filenames
+		when decoding (ie, no clobbering)
+
+Tue Jun 12 2001 pldaniels@pldaniels.com
+	- mime.c: replaced strncasecmp() with XAM_strncasecmp() to permit
+	portability to sysV and others
+	- mime.c: replaced random() call with rand()
+	- Added early exit routine for base64 if it detects two consecutive
+	hyphens ('-'), this is needed in order to deal with 1-in-1000
+	situation where a small file is encoded, and there is no separating
+	double CR\LF between the end of the base64 encoding, and the new
+	boundary line.
+
+
+Sun Jun 03 2001 pldaniels@pldaniels.com
+	-Release as 1.0.2
+	- Fixed occasional issue of a second attachment decoding to 57 bytes
+		in a BASE64 decode, added extra test routine for the length
+		comparisons so that a length of 0 could not be accepted.
+		MIME_decode_64:
+				else if (p_length == -1) {
+++					if (t_length > 0) p_length = t_length;
+				}
+
+	- Replaced strtok() calls with own XAM_strtok() from the XaMime project
+		NOTE- This strtok call DOES NOT compress consecutive delimeters like
+		strtok. The behaviour of XAM_strtok() is more like that of strsep().
+
+		The replacement was required to ensure thread-safety, as strtok() is
+		far from being thread-safe (it's bad enough when you 'accidently'
+		nest strtok() calls!. XAM_strtok() can be safely nested.
+
+
+Mon May 21 2001 pldaniels@pldaniels.com
+	- Fixed issue of ripMIME not successfully extracting a RFC822
+		"embedded" pack if it started with "From" or ">From"
+
+Mon May 14 2001 pldaniels@pldaniels.com
+	- Replaced fgetc() calls in BASE64 decoding routine with a set of
+		routines as defined in the new module ffget.[ch].  These new
+		routines read in the MIME encoded file line at a time using
+		fgets() and then feed out the file char at a time using the call
+		FFGET_fgetc(). Speed improvement is nearly DOUBLE thanks to this
+		routine (the more BASE64 decodes you do the better.
+
+Mon Apr 02 20:54:45 EST 2001 pldaniels <pldaniels@pldaniels.com>
+	- Added new var, _no_nameless[= 0].  If set to something other than
+		zero, then any attachments without an internally specified filename
+		will be removed (After processing)
+	- Added CLI param to turn on no_nameless.
+
+Wed Mar 28 14:26:06 EST 2001 pldaniels <pldaniels@pldaniels.com>
+	- Added patch for filename cleaning. Fixed patch to not overwrite '.'s
+	- Put MIME_clean_MIME_filename() into action, hopefully ISO filenames
+		should be supported without kludgy characters now.
+
+Tue Mar 27 21:39:24 EST 2001 pldaniels <pldaniels@pldaniels.com>
+	- Added MIME_get_attachment_count() which returns how many filename'd
+		attachments were found.
+	- Added in _current_line for the purpose of debugging, good for being
+		able to tell where ripMIME is through the reading of a mailpack
+	- Added "default" encoding method as being PLAINTEXT in the event
+		that there is no encoding format handled specifically (Thanks to
+		Hans Arder for supplying mailpack to display this)
+
+Tue Mar 21 <pldaniels@pldaniels.com>
+	-PR5
+	-a debugging line in the collect_headers fn was causing potential
+		encoding-format loss due to absorbing the vital Content-Type
+		line.
+
+Fri Mar 16 <pldaniels@pldaniels.com>
+	-Prerelease 4
+	-Implemented a stack based boundary layer detection system to
+		allow for nested in-line attachments, as typically generated
+		by drag'n'dropping files to email
+	-ISO filename decoding commenced, needing more examples of mailpacks
+		with ISO encoded filenames!
+	-Created the "daily update" version of ripMIME, to follow suit with
+		the new Inflex style of releases.
+
+
+Tue Feb 13 <pldaniels@pldaniels.com>
+	-Prerelease 3
+	-Fixed up some quoted-printable glitches (pack supplied by
+		James Cownie, thanks!)
+
+Tue Jan 30 00:49:51 EST 2001 worker <worker@inflex>
+	-Prerelease 2
+	-Removed tmpnam() call out of MIME_XHeader() function, not that this
+		 is actually ever used by ripMIME (its part of the cInflex suite)
+		 thanks to both Dave DeMaagd and Justin (SuidAfrika) for pointing
+		 this out to me.
+	- Corrected directory naming spec so that there aren't double //'s
+		(Thanks to James Cownie for preliminary notification)
+
+	-Changed the 'From' line detection routine to work with both un-read
+		(ones with just 'From joe@xxx.bbbb') as well as READ emails (ones
+		with '>From joe@xxx.bbbb'). Thanks to Sven for pointing this out
+		(Im too used to using pop3-pickup ;) Also allowed the FROM line to
+		be detected in the MIME_find_next_header() function.
+
+Sun Jan 28 15:10:49 EST 2001 worker <worker@inflex>
+	-v1.0.0 PreRelease 1
+	-Added in multiple-email (sequential) and nested (forwarded) email
+		attachment extraction support (painful!)
+	-Passed ripMIME through several thousand "real life" emails to
+		verify extraction ability
+	-Modified flag passing structures to contain most in struct _MIME_info
+		(required to get nested emails to extract correctly)
+	-Allowed user to turn on/off each logging option (syslog or stderr)
+	-Tried cleaning up comments a bit
+	-Added in more _debug() calls, making watching the process of decoding
+		via syslog() a bit easier.
+
+Fri Jan 12 11:00:12 EST 2001 worker <worker@inflex>
+	- Added patch supplied by Rolf to also counter for boundary specifiers which dont' have
+	enclosing "'s
+
+Tue Jan 09 13:38:16 EST 2001 worker <worker@inflex> (0.1.10)
+	-Added ability to handle mailpacks which had no CR/LF separator after the end of BASE64
+	decoding (Thanks to Hans Harder for suppling the mailpack!)
+
+Sun Jan 07 00:02:19 EST 2001 worker <worker@inflex> (0.1.9)
+	- Removed error reporting code from mime.c which said that end-of-file had been reached,
+	this is no longer required as we correctly handle plain-text (into the _headers_ file)
+	-Considering to release as v1.0.0
+
+Sat Dec 30 23:47:18 SAST 2000 worker <worker@inflex> (0.1.8)
+	- Added print-quotable decoder
+	- release 0.1.9
+
+Thu Dec 28 22:13:56 SAST 2000 worker <worker@inflex>
+	- Handler for mailpacks WITHOUT a boundary specified (single file emails)
+	- Forgot to change the version indicator in 0.1.7
+
+Sun Dec 24 23:32:09 SAST 2000 worker <worker@inflex>
+	- Modify base64 decoder to allow a _MAXIMUM_ of 76 chars on the line.
+	  and capable of any length of line less than 76 chars.
+	 - Release 0.1.7
+
+Fri Dec 22 23:02:57 SAST 2000 worker <worker@inflex>
+	Commenced fixing ripMIME for new style of MIME headers which have multiple
+	statements on a single line.
+
+Sat Nov 25 17:45:45 SAST 2000 worker <worker@inflex>
+	version 0.1.6
+		-Applied patch from Matthew to allow input from STDIN
+		-Added feature to allow headers to be dumped to a file (for picking up
+			kak virus etc)
+		-Added more comments to source code
+
+Thu Nov 23 18:30:20 SAST 2000 worker <worker@inflex>
+	version 0.1.5
+		-Corrected EOL detection for 76 char MIME encodings
+
+Thu Nov 23 18:30:20 SAST 2000 worker <worker@inflex>
+	version 0.1.4
+		-Corrected End of encoding MIME breakage
+		-Added better -DDEBUG reporting via syslog()
+
+Mon Oct 30 09:45:04 SAST 2000 worker <worker@inflex>
+	version 0.1.3
+		-Added input parameters to allow for more control
+		-Added ability to specify own text-only filename prefix
+
+Mon Oct 30 00:46:05 SAST 2000 worker <worker@inflex>
+	version 0.1.2
+		-Added code to remove zero byte files.
+
+Sun Oct 29 18:16:46 SAST 2000 worker <worker@inflex>
+	version 0.1.1 released.
