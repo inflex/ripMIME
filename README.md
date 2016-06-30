@@ -1,0 +1,29 @@
+## ripMIME - email attachment extractor
+
+
+### Features
+
+- Extracts all attachments even from multiple MUA personalities 
+
+
+### TODO
+
+- Update to modern coding standards (last mostly done 2009)
+
+
+### Installation
+
+1. Clone the project
+
+    $ git clone https://github.com/inflex/ripMIME.git
+
+2. Build it!
+
+    $ make
+
+
+### Usage
+
+### Discussion
+
+IRC Freenode: message inflex
