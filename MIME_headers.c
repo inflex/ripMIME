@@ -18,6 +18,7 @@
 
 */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -968,6 +969,17 @@ int MIMEH_strip_comments( char *input )
 }
 
 
+
+int MIMEH_check_ct(char *q)
+{
+	char *p=q;
+	p++;
+	if(*p!='\0' && strcasestr(p,"Content-Type:")==p)return 1;
+	p++;
+	if(*p!='\0' && strcasestr(p,"Content-Type:")==p)return 1;
+	return 0;
+}
+
 /*-----------------------------------------------------------------\
   Function Name	: MIMEH_fix_header_mistakes
   Returns Type	: int
@@ -1051,12 +1063,16 @@ int MIMEH_fix_header_mistakes( char *data )
 		/** if we had nothing but blanks till the end of the 
 		 ** line, then we need to pull up the next line **/
 		if (*q != '\0') {
-			DMIMEH LOGGER_log("%s:%d:MIMEH_fix_header_mistakes:DEBUG: Line needs fixing",FL);
-			*q = ' ';
-			q++;
-			if ((*q == '\n')||(*q == '\r')) *q = ' ';
-			DMIMEH LOGGER_log("%s:%d:MIMEH_fix_header_mistakes:DEBUG: Line fixed",FL);
-			p = q;
+			if(!MIMEH_check_ct(q)){
+				DMIMEH LOGGER_log("%s:%d:MIMEH_fix_header_mistakes:DEBUG: Line needs fixing",FL);
+				*q = ' ';
+				q++;
+				if ((*q == '\n')||(*q == '\r')) *q = ' ';
+				DMIMEH LOGGER_log("%s:%d:MIMEH_fix_header_mistakes:DEBUG: Line fixed",FL);
+				p = q;
+			}else{
+				p++;
+			}
 		} /** If q wasn't the end of data **/
 
 	} /** while looking for more ';' chars **/
