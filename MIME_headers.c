@@ -18,7 +18,6 @@
 
 */
 
-#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -847,7 +846,7 @@ char * MIMEH_absorb_whitespace( char *p )
   Returns Type	: int
   ----Parameter List
   1. char *input , 
-  ------------------
+  ------------------ 
   Exit Codes	: 
   Side Effects	: 
   --------------------------------------------------------------------
@@ -968,15 +967,40 @@ int MIMEH_strip_comments( char *input )
 	return 0;
 }
 
+/*
+ * Case insensitive strstr() without calling on system libs
+ * which can vary between OSs for the strcasestr() call at times
+ */
+char *MIMEH_strcasestr(char *haystack, char *needle)
+{
+	char *hs, *ne;
+	char *result = NULL;
+
+	hs = strdup(haystack);
+	PLD_strlower(hs);
+	ne = strdup(needle);
+	PLD_strlower(ne);
+
+	if (hs && ne) {
+		result = strstr(hs, ne);
+		result = result -hs +haystack;
+
+	}
+	
+	if (hs) free(hs);
+	if (ne) free(ne);
+
+	return result;
+}
 
 
 int MIMEH_check_ct(char *q)
 {
 	char *p=q;
 	p++;
-	if(*p!='\0' && strcasestr(p,"Content-Type:")==p)return 1;
+	if(*p!='\0' && MIMEH_strcasestr(p,"Content-Type:")==p)return 1;
 	p++;
-	if(*p!='\0' && strcasestr(p,"Content-Type:")==p)return 1;
+	if(*p!='\0' && MIMEH_strcasestr(p,"Content-Type:")==p)return 1;
 	return 0;
 }
 
