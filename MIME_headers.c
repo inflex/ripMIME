@@ -846,7 +846,7 @@ char * MIMEH_absorb_whitespace( char *p )
   Returns Type	: int
   ----Parameter List
   1. char *input , 
-  ------------------
+  ------------------ 
   Exit Codes	: 
   Side Effects	: 
   --------------------------------------------------------------------
@@ -967,6 +967,42 @@ int MIMEH_strip_comments( char *input )
 	return 0;
 }
 
+/*
+ * Case insensitive strstr() without calling on system libs
+ * which can vary between OSs for the strcasestr() call at times
+ */
+char *MIMEH_strcasestr(char *haystack, char *needle)
+{
+	char *hs, *ne;
+	char *result = NULL;
+
+	hs = strdup(haystack);
+	PLD_strlower(hs);
+	ne = strdup(needle);
+	PLD_strlower(ne);
+
+	if (hs && ne) {
+		result = strstr(hs, ne);
+		result = result -hs +haystack;
+
+	}
+	
+	if (hs) free(hs);
+	if (ne) free(ne);
+
+	return result;
+}
+
+
+int MIMEH_check_ct(char *q)
+{
+	char *p=q;
+	p++;
+	if(*p!='\0' && MIMEH_strcasestr(p,"Content-Type:")==p)return 1;
+	p++;
+	if(*p!='\0' && MIMEH_strcasestr(p,"Content-Type:")==p)return 1;
+	return 0;
+}
 
 /*-----------------------------------------------------------------\
   Function Name	: MIMEH_fix_header_mistakes
@@ -1051,12 +1087,16 @@ int MIMEH_fix_header_mistakes( char *data )
 		/** if we had nothing but blanks till the end of the 
 		 ** line, then we need to pull up the next line **/
 		if (*q != '\0') {
-			DMIMEH LOGGER_log("%s:%d:MIMEH_fix_header_mistakes:DEBUG: Line needs fixing",FL);
-			*q = ' ';
-			q++;
-			if ((*q == '\n')||(*q == '\r')) *q = ' ';
-			DMIMEH LOGGER_log("%s:%d:MIMEH_fix_header_mistakes:DEBUG: Line fixed",FL);
-			p = q;
+			if(!MIMEH_check_ct(q)){
+				DMIMEH LOGGER_log("%s:%d:MIMEH_fix_header_mistakes:DEBUG: Line needs fixing",FL);
+				*q = ' ';
+				q++;
+				if ((*q == '\n')||(*q == '\r')) *q = ' ';
+				DMIMEH LOGGER_log("%s:%d:MIMEH_fix_header_mistakes:DEBUG: Line fixed",FL);
+				p = q;
+			}else{
+				p++;
+			}
 		} /** If q wasn't the end of data **/
 
 	} /** while looking for more ';' chars **/
