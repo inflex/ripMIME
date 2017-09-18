@@ -53,7 +53,7 @@ struct RIPMIME_globals
 char defaultdir[] = ".";
 struct RIPMIME_globals *ripmime_globals = NULL;
 
-char version[] = "v1.4.0.9 - November 07, 2008 (C) PLDaniels http://www.pldaniels.com/ripmime";
+char version[] = "v1.4.0.10 - September 2017 (C) PLDaniels http://www.pldaniels.com/ripmime";
 char help[] = "ripMIME -i <mime file> -d <directory>"
 	"[-p prefix] [-e [header file]] [-vVh] [--version]"
 	"[--no_nameless] [--unique_names [--prefix|--postfix|--infix]]"
