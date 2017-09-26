@@ -1114,14 +1114,14 @@ Errors:
 int MIME_is_file_RFC822( char *fname )
 {
 	char conditions[16][16] = {
-		"Received: ", "From: ", "Subject: ", "Date: ", "Content-", "content-", "from: ", "subject: ", "date: ", "boundary=", "Boundary=" 		};
+		"Received: ", "From: ", "Subject: ", "Date: ", "Content-", "content-", "from: ", "subject: ", "date: ", "boundary=", "Boundary=", "MIME-Version" 		};
 	int result = 0;
+	int flag_mime_version = 0;
 	int hitcount = 0;
 	int linecount = 100; // We should only need to read the first 10 lines of any file.
 	char *line;
 	FILE *f;
-
-
+	
 	if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_is_file_RFC822:DEBUG: Testing %s for RFC822 headers",FL,fname);
 
 	f = fopen(fname,"r");
@@ -1141,13 +1141,13 @@ int MIME_is_file_RFC822( char *fname )
 		return 0;
 	}
 
-	while ((hitcount < 2)&&(fgets(line,1024,f))&&(linecount--))
+	while (((!flag_mime_version)||(hitcount < 2))&&(fgets(line,1024,f))&&(linecount--))
 	{
 		/** test every line for possible headers, until we get a blank line **/
 
 		if ((glb.header_longsearch == 0)&&(*line == '\n' || *line == '\r')) break; 
 
-		for (result = 0; result < 11; result++)
+		for (result = 0; result < 12; result++)
 		{
 			/** Test for every possible MIME header prefix, ie, From: Subject: etc **/
 			if (MIME_DPEDANTIC) LOGGER_log("%s:%d:MIME_is_file_mime:DEBUG: Testing for '%s' in '%s'", FL, line, conditions[result]);
@@ -1156,6 +1156,11 @@ int MIME_is_file_RFC822( char *fname )
 				/** If we get a match, then increment the hit counter **/
 				hitcount++;
 				if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_is_file_RFC822:DEBUG: Hit on %s",FL,conditions[result]);
+				if (result == 11)
+				{
+					flag_mime_version = 1;
+					if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_is_file_RFC822:DEBUG: Find 'MIME Version' field",FL);
+				}
 			}
 		}
 	}
@@ -3203,7 +3208,7 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
 				// own headers, so, we just simply call the MIMEH_parse call again
 				// and get the attachment details
 
-				while ((result == 0)||(result == MIME_STATUS_ZERO_FILE))
+				while ((result == 0)||(result == MIME_STATUS_ZERO_FILE)||(result == MIME_ERROR_RECURSION_LIMIT_REACHED))
 				{
 					h->content_type = -1;
 					h->filename[0] = '\0';
