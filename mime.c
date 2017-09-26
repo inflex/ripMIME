@@ -1167,7 +1167,7 @@ int MIME_is_file_RFC822( char *fname )
 
 	fclose(f);
 
-	if (hitcount >= 2) result = 1;
+	if (hitcount >= 2 && flag_mime_version) result = 1;
 	else result = 0;
 
 	if (line) free(line);
