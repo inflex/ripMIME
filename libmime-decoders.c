@@ -474,7 +474,9 @@ int MDECODE_decode_ISO( char *isostring, int size )
 				DMD LOGGER_log("%s:%d:MDECODE_decode_ISO:DEBUG: ISO encoding char = '%c'",FL,encoding_type);
 
 				// Get the encoded string
-				token_end = strpbrk(iso,"?;\n\r\t"); //DROPPED THE SPACE here
+				token_end = strpbrk(iso,"?;\n\r"); //DROPPED THE SPACE here
+				// When unfolding, WSP should be ignored. (https://tools.ietf.org/html/rfc5322#section-2.2.3)
+				// WSP =  SP / HTAB ; white space (https://tools.ietf.org/html/rfc5234#appendix-B.1)
 				if (token_end != NULL)
 				{
 					if ((*token_end != '?')&&(*token_end != ';'))
