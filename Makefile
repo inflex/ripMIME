@@ -73,8 +73,10 @@ riptest: ${OFILES}
 
 install: ${OBJ}
 	strip ripmime
-	cp ripmime ${LOCATION}/bin/
-	cp ripmime.1  ${LOCATION}/man/man1
+	install -d ${LOCATION}/bin/
+	install -m 755 ripmime ${LOCATION}/bin/
+	install -d ${LOCATION}/man/
+	install -m 644 ripmime.1  ${LOCATION}/man/man1
 
 ffget_test: ffget_mmap_test.c ffget_mmap.[ch] logger.o ffget_mmap.o
 	${CC} ${CFLAGS} ffget_mmap_test.c logger.o ffget_mmap.o -o ffgt
