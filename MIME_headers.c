@@ -1431,6 +1431,7 @@ int MIMEH_recompose_multivalue( struct MIMEH_header_info *hinfo, char *header_na
     {
         char *q;
         char *buffer_start;
+		  int is_quoted = 0;
 
         // Setup our buffer insertion point for what ever new data we extract
         buffer_start = buffer +strlen(buffer);
@@ -1449,7 +1450,7 @@ int MIMEH_recompose_multivalue( struct MIMEH_header_info *hinfo, char *header_na
             p = strstr(q, header_name_prefix);
             if (p == NULL) break;
 
-            DMIMEH LOGGER_log("%s:%d:MIMEH_recompose_multivalue:DEBUG: prefix = %s", FL, p);
+            DMIMEH LOGGER_log("%s:%d:MIMEH_recompose_multivalue:DEBUG: prefix = '''%s'''", FL, p);
 
             q = strchr(p,'=');
             if (q == NULL) break;
@@ -1463,10 +1464,20 @@ int MIMEH_recompose_multivalue( struct MIMEH_header_info *hinfo, char *header_na
             // Move the pointer past the '=' separator
             q++;
 
-            DMIMEH LOGGER_log("%s:%d:MIMEH_recompose_multivalue:DEBUG: data = %s", FL, q);
+            DMIMEH LOGGER_log("%s:%d:MIMEH_recompose_multivalue:DEBUG: data = '''%s'''", FL, q);
+
+				// Is our string quoted (ie, will likely contain whitespace)
+				//
+				if (*q == '"') {
+					DMIMEH LOGGER_log("%s:%d:MIMEH_recompose_multivalue:DEBUG: multipart segment is quote-prefixed", FL);
+					is_quoted = 1;
+				}
 
             // Find where this multipart string ends
-            end_point = strpbrk(q, ";\t\n\r ");
+				//
+				//
+				if (is_quoted) end_point = strpbrk(q+1,";\r\n\"");
+				else end_point = strpbrk(q, ";\t\n\r ");
             if (end_point != NULL)
             {
                 *end_point = '\0';
