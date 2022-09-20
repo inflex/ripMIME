@@ -4,6 +4,18 @@ Format of entry line:
 	- <Developer initials>:<Change made for REL[ease] or DEV[elopment] versions>
 
 CHANGES---------------------------------------------------------------
+Tue Sep 20 2022
+	-PLD:DEV:
+	Fixed multiline header compositions such as filename*1=... where
+	the line was quoted and contained whitespace
+
+	Cleaned up some compiler warnings
+
+	Added make debug
+
+	Enlarged static array sizes for MIME_headers
+
+
 Sat Dec 13 2008
 	-PLD:DEV:
 	Fixed up segfault during debug run from missing parameter in LOGGER
