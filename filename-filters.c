@@ -36,11 +36,11 @@
 
 
 struct FNFILTER_globals {
-	int debug;
-	int verbose;
-	int paranoid;
+    int debug;
+    int verbose;
+    int paranoid;
 
-	int x_mac;
+    int x_mac;
 };
 
 static struct FNFILTER_globals glb;
@@ -48,42 +48,42 @@ static struct FNFILTER_globals glb;
 
 int FNFILTER_init( void )
 {
-	glb.debug = 0;
-	glb.verbose = 0;
-	glb.paranoid = 0;
-	glb.x_mac = 0;
+    glb.debug = 0;
+    glb.verbose = 0;
+    glb.paranoid = 0;
+    glb.x_mac = 0;
 
-	return 0;
+    return 0;
 }
 
 
 int FNFILTER_set_debug( int level )
 {
-	glb.debug = level;
+    glb.debug = level;
 
-	return glb.debug;
+    return glb.debug;
 }
 
 int FNFILTER_set_verbose( int level )
 {
-	glb.verbose = level;
+    glb.verbose = level;
 
-	return glb.verbose;
+    return glb.verbose;
 }
 
 
 int FNFILTER_set_mac( int level )
 {
-	glb.x_mac = level;
+    glb.x_mac = level;
 
-	return glb.x_mac;
+    return glb.x_mac;
 }
 
 int FNFILTER_set_paranoid( int level )
 {
-	glb.paranoid = level;
+    glb.paranoid = level;
 
-	return glb.paranoid;
+    return glb.paranoid;
 }
 
 
@@ -96,70 +96,70 @@ Errors:
 ------------------------------------------------------------------------*/
 int FNFILTER_paranoid_filter( char *fname, int size )
 {
-	char tmp[1024];
-	char *p;
+    char tmp[1024];
+    char *p;
 
 
-	/* Scan for . and .. filenames 
-		** 20040727-12H54
-		** Patch supplied by Marco Ariano
-		** Patch modified by Paul L Daniels
-		**
-	*/	
-	if ((1 == size)&&('.' == *fname))
-	{
-		*fname = '_';
-		return 0;
-	} else if ((2 == size)&&(0 == strncmp(fname,"..",2))) {
-		snprintf(fname,3,"__");
-		return 0;
-	}
-	
-	
-	/* scan out any directory separators */
-
-	p = strrchr(fname,'/');
-	if (p)
-	{
-		// Check to see that this seperator isn't the -last- char in the string
-		if (*(p+1) == '\0') *p = '\0';
-		else
-		{
-			p++;
-			PLD_strncpy(tmp,p,sizeof(tmp));
-			PLD_strncpy(fname,tmp,size);
-		}
-	}
-	else if ( (p = strrchr(fname,'\\')))
-	{
-		// Check to see that this seperator isn't the -last- char in the string
-		if (*(p+1) == '\0') *p = '\0';
-		else
-		{
-			p++;
-			PLD_strncpy(tmp,p,sizeof(tmp));
-			PLD_strncpy(fname,tmp,size);
-		}
-	}
+    /* Scan for . and .. filenames
+        ** 20040727-12H54
+        ** Patch supplied by Marco Ariano
+        ** Patch modified by Paul L Daniels
+        **
+    */
+    if ((1 == size)&&('.' == *fname))
+    {
+        *fname = '_';
+        return 0;
+    } else if ((2 == size)&&(0 == strncmp(fname,"..",2))) {
+        snprintf(fname,3,"__");
+        return 0;
+    }
 
 
-	if ( glb.paranoid > 0 )
-	{
-		// If we're really paranoid, then we go along and convert anything we don't like
-		//	the look of into 7-bit
-		//
-		//	These days we shouldn't be using this any more as there are many filenames
-		//	which require > 7-bit charsets.
+    /* scan out any directory separators */
 
-		while (*fname)
-		{
-			if( !isalnum((int)*fname) && (*fname != '.') ) *fname='_';
-			if( (*fname < ' ')||(*fname > '~') ) *fname='_';
-			fname++;
-		}
-	}
+    p = strrchr(fname,'/');
+    if (p)
+    {
+        // Check to see that this seperator isn't the -last- char in the string
+        if (*(p+1) == '\0') *p = '\0';
+        else
+        {
+            p++;
+            PLD_strncpy(tmp,p,sizeof(tmp));
+            PLD_strncpy(fname,tmp,size);
+        }
+    }
+    else if ( (p = strrchr(fname,'\\')))
+    {
+        // Check to see that this seperator isn't the -last- char in the string
+        if (*(p+1) == '\0') *p = '\0';
+        else
+        {
+            p++;
+            PLD_strncpy(tmp,p,sizeof(tmp));
+            PLD_strncpy(fname,tmp,size);
+        }
+    }
 
-	return 0;
+
+    if ( glb.paranoid > 0 )
+    {
+        // If we're really paranoid, then we go along and convert anything we don't like
+        //  the look of into 7-bit
+        //
+        //  These days we shouldn't be using this any more as there are many filenames
+        //  which require > 7-bit charsets.
+
+        while (*fname)
+        {
+            if( !isalnum((int)*fname) && (*fname != '.') ) *fname='_';
+            if( (*fname < ' ')||(*fname > '~') ) *fname='_';
+            fname++;
+        }
+    }
+
+    return 0;
 }
 
 
@@ -179,106 +179,106 @@ Errors:
 ------------------------------------------------------------------------*/
 int FNFILTER_filter( char *fname, int size )
 {
-	int fnl;
-	char tmp[1024];
-	char *p;
+    int fnl;
+    char tmp[1024];
+    char *p;
 
-	if (fname == NULL) return 0;
-	
-  	fnl = strlen(fname);
+    if (fname == NULL) return 0;
 
-	DFN LOGGER_log("%s:%d:FNFILTER_filter:DEBUG: fname[%d chars] = '%s'\n", FL, fnl, fname );
+    fnl = strlen(fname);
 
-	/** If we're handling a Mac file, prefilter **/
-	if (glb.x_mac == 1)
-	{
-		char *q = fname;
+    DFN LOGGER_log("%s:%d:FNFILTER_filter:DEBUG: fname[%d chars] = '%s'\n", FL, fnl, fname );
 
-		DFN LOGGER_log("%s:%d:FNFILTER_filter:DEBUG: Filtering x-mac filename '%s'",FL,fname);
-		while (*q)
-		{
-			if (*q == '/') *q = '-'; /** Convert the Mac / separator to a hyphen **/
-			q++;
-		}
-		DFN LOGGER_log("%s:%d:FNFILTER_filter:DEBUG: x-mac filename is now '%s'",FL,fname);
-	}
+    /** If we're handling a Mac file, prefilter **/
+    if (glb.x_mac == 1)
+    {
+        char *q = fname;
+
+        DFN LOGGER_log("%s:%d:FNFILTER_filter:DEBUG: Filtering x-mac filename '%s'",FL,fname);
+        while (*q)
+        {
+            if (*q == '/') *q = '-'; /** Convert the Mac / separator to a hyphen **/
+            q++;
+        }
+        DFN LOGGER_log("%s:%d:FNFILTER_filter:DEBUG: x-mac filename is now '%s'",FL,fname);
+    }
 
 
-	/* We only look at trimming the quotes off a filename if it has more than 2 chars
-		* because obviously we'll need to strip off 2 chars (leading and finishing quote)
-		*/
-	if ( fnl > 2 )
-	{
+    /* We only look at trimming the quotes off a filename if it has more than 2 chars
+        * because obviously we'll need to strip off 2 chars (leading and finishing quote)
+        */
+    if ( fnl > 2 )
+    {
 
-		/* if the MIME_filename starts and ends with "'s */
-		if ((fname[0] == '\"') && (fname[fnl-1] == '\"'))
-		{
-			if (FNFILTER_DNORMAL) LOGGER_log("%s:%d:FNFILTER_filter:DEBUG: Trimming quotes off filename\n", FL );
+        /* if the MIME_filename starts and ends with "'s */
+        if ((fname[0] == '\"') && (fname[fnl-1] == '\"'))
+        {
+            if (FNFILTER_DNORMAL) LOGGER_log("%s:%d:FNFILTER_filter:DEBUG: Trimming quotes off filename\n", FL );
 
-			/* reduce the file namelength by two*/
-			fnl = fnl -2; // 17-11-2002: was =-2, thanks to Vasily Chernikov for spotting the glaring error!
+            /* reduce the file namelength by two*/
+            fnl = fnl -2; // 17-11-2002: was =-2, thanks to Vasily Chernikov for spotting the glaring error!
 
-			/* shuffle the MIME_filename chars down */
-			memmove(fname,fname+1,fnl);
+            /* shuffle the MIME_filename chars down */
+            memmove(fname,fname+1,fnl);
 
-			/* terminate the string */
-			fname[fnl] = '\0';
-			if (FNFILTER_DNORMAL) LOGGER_log("%s:%d:FNFILTER_filter:DEBUG: Trimming filename done, fname = '%s'\n", FL, fname );
-		} /* if */
-	} /* if */
+            /* terminate the string */
+            fname[fnl] = '\0';
+            if (FNFILTER_DNORMAL) LOGGER_log("%s:%d:FNFILTER_filter:DEBUG: Trimming filename done, fname = '%s'\n", FL, fname );
+        } /* if */
+    } /* if */
 
-	p = strrchr(fname,'/');
-	if (p)
-	{
-		p++;
-		PLD_strncpy( tmp, p, sizeof(tmp) );
-		PLD_strncpy( fname, tmp, size);
+    p = strrchr(fname,'/');
+    if (p)
+    {
+        p++;
+        PLD_strncpy( tmp, p, sizeof(tmp) );
+        PLD_strncpy( fname, tmp, size);
 
-	} else {
+    } else {
 
-		// Check for Windows/DOS backslash seperator
+        // Check for Windows/DOS backslash seperator
 
-		p = strrchr( fname, '\\' );
-		if ( p )
-		{
-			if ( *(p+1) != '"' )
-			{
-				p++;
-				PLD_strncpy( tmp, p, sizeof(tmp) );
-				PLD_strncpy( fname, tmp, size );
-			}
-		}
-	}
+        p = strrchr( fname, '\\' );
+        if ( p )
+        {
+            if ( *(p+1) != '"' )
+            {
+                p++;
+                PLD_strncpy( tmp, p, sizeof(tmp) );
+                PLD_strncpy( fname, tmp, size );
+            }
+        }
+    }
 
-	// Scan for ? symbols - these are often used to make the email client pass paremeters to the filename
-	// 	Check though to see that the previous character is not a '=' symbol, because if it is, then we
-	//	actually have an ISO encoded filename
+    // Scan for ? symbols - these are often used to make the email client pass paremeters to the filename
+    //  Check though to see that the previous character is not a '=' symbol, because if it is, then we
+    //  actually have an ISO encoded filename
 
-	p = strchr( fname, '?' );
-	if (p != NULL)
-	{
-		if (p > fname)
-		{
-			if (*(p-1) != '=')
-			{
-				*p = '\0';
-			} else {
-				// leave the ? alone, as it's part of an ISO encoded filename
-			}
+    p = strchr( fname, '?' );
+    if (p != NULL)
+    {
+        if (p > fname)
+        {
+            if (*(p-1) != '=')
+            {
+                *p = '\0';
+            } else {
+                // leave the ? alone, as it's part of an ISO encoded filename
+            }
 
-		} else {
-			// First char of the filename is a '?', change this to a hypen.
-			*p = '-';
-		}
-	}
-		
-	if (FNFILTER_DNORMAL) LOGGER_log("%s:%d:FNFILTER_filter:DEBUG: Starting paranoia filter\n", FL );
+        } else {
+            // First char of the filename is a '?', change this to a hypen.
+            *p = '-';
+        }
+    }
 
-	FNFILTER_paranoid_filter( fname, strlen( fname ) );
+    if (FNFILTER_DNORMAL) LOGGER_log("%s:%d:FNFILTER_filter:DEBUG: Starting paranoia filter\n", FL );
 
-	if (FNFILTER_DNORMAL) LOGGER_log("%s:%d:FNFILTER_filter:DEBUG: paranoia filter done. Filename='%s'\n", FL, fname );
+    FNFILTER_paranoid_filter( fname, strlen( fname ) );
 
-	return 0;
+    if (FNFILTER_DNORMAL) LOGGER_log("%s:%d:FNFILTER_filter:DEBUG: paranoia filter done. Filename='%s'\n", FL, fname );
+
+    return 0;
 }
 
 
