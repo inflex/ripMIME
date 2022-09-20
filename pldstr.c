@@ -257,7 +257,7 @@ char *PLD_strtok( struct PLD_strtok *st, char *line, char *delimeters )
 
     // Where we are left, is the start of our token.
     result = st->start;
-    if ((st->start)&&(st->start != '\0'))
+    if ((st->start)&&(*(st->start) != '\0'))
     {
         stop = strpbrk( st->start, delimeters ); /* locate our next delimeter */
         // If we found a delimeter, then that is good.  We must now break the string here

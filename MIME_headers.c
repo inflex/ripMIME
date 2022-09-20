@@ -3007,7 +3007,7 @@ int MIMEH_headers_get( struct MIMEH_header_info *hinfo, FFGET_FILE *f )
 
     // Initialise header defects array.
     hinfo->header_defect_count = 0;
-    memset(hinfo->defects, 0, _MIMEH_DEFECT_ARRAY_SIZE);
+    memset(hinfo->defects, 0, sizeof(int) *_MIMEH_DEFECT_ARRAY_SIZE);
 
     snprintf( hinfo->content_type_string, _MIMEH_CONTENT_TYPE_MAX , "text/plain" );
 

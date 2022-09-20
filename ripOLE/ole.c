@@ -568,6 +568,7 @@ int OLE_get_header( struct OLE_object *ole )
 	int result = 0;
 	ole->header.sector_size = OLE_HEADER_BLOCK_SIZE;
 	result = OLE_get_block( ole, -1, ole->header_block );
+	if (result != 0) return result;
 
 	if (OLE_is_file_OLE( ole ) == 0)
 	{

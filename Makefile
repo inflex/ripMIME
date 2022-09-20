@@ -4,7 +4,7 @@
 # 0.1.13: Added -I.
 
 LOCATION=/usr/local
-VERSION=0.1.14
+VERSION=0.1.15
 # VERSION changes
 #---------------------
 # 0.1.14: Added 'install' usage
@@ -15,7 +15,7 @@ VERSION=0.1.14
 #	use our recommended settings.
 #CFLAGS ?= -Wall -g -O2 -Werror $(CPU_OPTS)
 #CFLAGS=-Wall -g -O2 -Wundef -Wshadow -Wsign-compare -I.
-CFLAGS=-Wall -g -I. -O2 
+CFLAGS=-Wall  -I. -O2 
 
 # OLE decoding is still considered to be 'beta' mode - so it 
 #	disabled in the stable release of ripMIME for now
@@ -36,7 +36,11 @@ RIPOLE_OBJS= ripOLE/ole.o ripOLE/olestream-unwrap.o ripOLE/bytedecoders.o  ripOL
 #RIPOLE_OBJS=
 OFILES= strstack.o mime.o ffget.o MIME_headers.o tnef/tnef.o rawget.o pldstr.o logger.o libmime-decoders.o boundary-stack.o uuencode.o filename-filters.o $(RIPOLE_OBJS)
 
+
 default: tnef/tnef.o ripmime ripOLE/ole.o
+
+debug: CFLAGS=-Wall -ggdb -DDEBUG -I. -O0
+debug: default
 
 buildcodes.h: 
 	./generate-buildcodes.sh

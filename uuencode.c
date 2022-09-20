@@ -616,6 +616,9 @@ int UUENCODE_decode_uu( FFGET_FILE *f, char *unpackdir, char *input_filename, ch
 					{
 						size_t bc;
 						bc = fwrite(writebuffer, 1, wbcount, outf);
+						if (bc != wbcount) {
+							LOGGER_log("%s:%d:ERROR: Attempted to write %ld bytes, only wrote %ld\n", FL, wbcount, bc);
+						}
 						wbpos = writebuffer;
 						wbcount = 0;
 					}
@@ -643,6 +646,10 @@ int UUENCODE_decode_uu( FFGET_FILE *f, char *unpackdir, char *input_filename, ch
 			{
 				size_t bc;
 				bc = fwrite(writebuffer, 1, wbcount, outf);
+				if (bc != wbcount) {
+					LOGGER_log("%s:%d:ERROR: Attempted to write %ld bytes, only wrote %ld\n", FL, wbcount, bc);
+				}
+
 			}
 
 
