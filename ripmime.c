@@ -763,7 +763,7 @@ int main (int argc, char **argv)
    }
 
    // Unpack the contents
-   RIPMIME_unpack(&glb);
+   result = RIPMIME_unpack(&glb);
 
    // Possible exit codes include;
    //      0 - all okay

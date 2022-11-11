@@ -1373,7 +1373,7 @@ int MIME_decode_text( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *
     {
         /** If we cannot open the file for reading, leave an error and return -1 **/
         LOGGER_log("%s:%d:MIME_decode_text:ERROR: print-quotable input stream broken.",FL);
-        return -1;
+        return _EXITERR_MIMEREAD_CANNOT_OPEN_INPUT;
     }
     if (f)
     {
@@ -1383,7 +1383,7 @@ int MIME_decode_text( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *
         {
             /** If we were unable to open the output file, report the error and return -1 **/
             LOGGER_log("%s:%d:MIME_decode_text:ERROR: cannot open %s for writing",FL,fullfilename);
-            return -1;
+            return _EXITERR_MIMEREAD_CANNOT_WRITE_OUTPUT;
         }
         while ((get_result = FFGET_fgets(line,1023,f))&&(of))
         {
@@ -2434,6 +2434,8 @@ int MIME_decode_encoding( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_in
         case MIME_ERROR_RECURSION_LIMIT_REACHED:
             return result;
             break;
+		  default: 
+				return result;
     }
 
     if ((result != -1)&&(result != MIME_STATUS_ZERO_FILE))
