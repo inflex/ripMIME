@@ -21,6 +21,7 @@
 
     $ make
 
+For armv5: `make CC=arm-linux-gnueabi-gcc CFLAGS="-Wall --static -O2 -marm -march=armv5tej"`
 
 ### Usage
 
