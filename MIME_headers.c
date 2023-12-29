@@ -2233,7 +2233,7 @@ int MIMEH_parse_contentlocation( char *header_name, char *header_value, struct M
         {
             if (MIMEH_DNORMAL) LOGGER_log("%s:%d:MIME_parse_contentlocation:DEBUG: filename = %s\n", FL, p);
             snprintf(hinfo->name, sizeof(hinfo->name),"%s",p);
-            snprintf(hinfo->filename, sizeof(hinfo->name),"%s",p);
+            snprintf(hinfo->filename, sizeof(hinfo->filename),"%s",p);
             FNFILTER_filter(hinfo->filename, _MIMEH_FILENAMELEN_MAX);
             SS_push(&(hinfo->ss_filenames), hinfo->filename, strlen(hinfo->filename));
 
