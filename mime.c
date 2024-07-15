@@ -1259,7 +1259,7 @@ int MIME_decode_raw( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *h
     if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_raw:DEBUG: Start\n",FL);
 
     snprintf(fullpath,sizeof(fullpath),"%s/%s",unpackdir,hinfo->filename);
-    fo = open(fullpath, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR);
+    fo = open(fullpath, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP);
 
     if (fo == -1)
     {
@@ -1554,7 +1554,7 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
     if (glb.unique_names) MIME_test_uniquename( unpackdir, hinfo->filename, glb.rename_method );
     snprintf(fullMIME_filename,_MIME_STRLEN_MAX,"%s/%s",unpackdir,hinfo->filename);
     //of = fopen(fullMIME_filename,"wb");
-    of = open(fullMIME_filename, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR);
+    of = open(fullMIME_filename, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP);
     /* if we were unable to open the output file, then we better log an error and drop out */
     if (of < 0)
     {
@@ -1949,7 +1949,7 @@ size_t MIME_read_raw( char *src_mpname, char *dest_mpname, size_t rw_buffer_size
     }
 
     /* open up our input file */
-    fout = open(dest_mpname,O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR);
+    fout = open(dest_mpname,O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP);
     if (fout == -1) {
         LOGGER_log("%s:%d:MIME_read_raw:ERROR: Cannot open '%s' for writing. (%s)",FL, dest_mpname, strerror(errno));
         return -1;
