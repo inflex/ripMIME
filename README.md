@@ -25,6 +25,7 @@ For armv5: `make CC=arm-linux-gnueabi-gcc CFLAGS="-Wall --static -O2 -marm -marc
 
 ### Usage
 
-### Discussion
+### Contact
 
-IRC Freenode: message inflex
+Find me on Discord: https://discord.gg/CaSfcGXxUk
+Email me at pldaniels@gmail.com
