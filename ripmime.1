@@ -9,7 +9,7 @@ ripMIME \-i <mime file> \-d <directory>
 .br 
 [\-v][\-q][\-\-verbose\-contenttype][\-\-verbose\-oldstyle][\-\-verbose\-defects][\-\-stdout][\-\-stderr][\-\-syslog]
 .br 
-[\-\-paranoid]
+[\-\-paranoid][\-\-mailbox][\-\-formdata]
 .br 
 [\-\-name\-by\-type][\-\-no\-nameless][\-\-overwrite][\-\-no_nameless]
 .br 
@@ -98,6 +98,9 @@ Set the maximum recursion level into a mailpack.  Often emails are forwarded cop
 .TP 
 \-\-mailbox
 Process mailbox file
+.TP
+\-\-formdata
+Inibit the default conversion of NULL, zero-value bytes to spaces in data, which is normally done to facilitate text parsing but will break raw binary content if present. 
 .TP 
 \-\-extended\-errors
 Returns error codes for non\-fatal decoding situations
