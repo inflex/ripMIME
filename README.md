@@ -27,5 +27,5 @@ For armv5: `make CC=arm-linux-gnueabi-gcc CFLAGS="-Wall --static -O2 -marm -marc
 
 ### Contact
 
-##### Discord: https://discord.gg/CaSfcGXxUk
+##### Website: https://pldaniels.com
 ##### Email: pldaniels@gmail.com
