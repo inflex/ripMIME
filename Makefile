@@ -3,7 +3,6 @@
 #
 # 0.1.13: Added -I.
 
-LOCATION=/usr/local
 VERSION=0.1.15
 # VERSION changes
 #---------------------
@@ -72,12 +71,19 @@ ripmime: ${OFILES} ripmime.c buildcodes.h
 riptest: ${OFILES}
 	${CC} ${CFLAGS} riptest.c ${OFILES} -o riptest
 
-install: ${OBJ}
-	strip ripmime
-	install -d ${LOCATION}/bin/
-	install -m 755 ripmime ${LOCATION}/bin/
-	install -d ${LOCATION}/man/
-	install -m 644 ripmime.1  ${LOCATION}/man/man1
+DESTDIR =
+prefix  = /usr/local
+  exec_prefix = ${prefix}
+    bindir = ${exec_prefix}/bin
+  datarootdir = ${prefix}/share
+    mandir = ${datarootdir}/man
+
+.PHONY: install install-exec install-man
+install: install-exec install-man
+install-exec: ${OBJ}
+	install -m555 -s -Dt ${DESTDIR}${bindir} ${OBJ}
+install-man:
+	install -m444 -Dt ${DESTDIR}${mandir}/man1 ripmime.1
 
 ffget_test: ffget_mmap_test.c ffget_mmap.[ch] logger.o ffget_mmap.o
 	${CC} ${CFLAGS} ffget_mmap_test.c logger.o ffget_mmap.o -o ffgt
