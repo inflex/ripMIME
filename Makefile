@@ -35,14 +35,18 @@ RIPOLE_OBJS= ripOLE/ole.o ripOLE/olestream-unwrap.o ripOLE/bytedecoders.o  ripOL
 #RIPOLE_OBJS=
 OFILES= strstack.o mime.o ffget.o MIME_headers.o tnef/tnef.o rawget.o pldstr.o logger.o libmime-decoders.o boundary-stack.o uuencode.o filename-filters.o $(RIPOLE_OBJS)
 
-
-default: tnef/tnef.o ripmime ripOLE/ole.o
-
+all: ripmime
 debug: CFLAGS=-Wall -ggdb -DDEBUG -I. -O0
-debug: default
+debug: all
+sco: LIBS += -lsocket
+sco: ripmime
+.PHONY: all debug sco
 
 buildcodes.h: 
 	./generate-buildcodes.sh
+
+clean::
+	rm -f buildcodes.h
 
 ${RIPOLE_OBJS} tnef/tnef.o:
 	${MAKE} -C ${@D} ${@F} CFLAGS="${CFLAGS} ${CFLAGS-y}"
@@ -53,7 +57,6 @@ ${RIPOLE_OBJS} tnef/tnef.o:
 CFLAGS-y   = ${CFLAGS}
 LDFLAGS-y  = ${LDFLAGS}
 
-all: ${OBJ} 
 solib          := libripmime.so.1.4.0
 solib-soname   != awk -vlib=${solib} -vsuffix="\\.so\\.[0-9]+" \
 	'BEGIN{match(lib,suffix);print substr(lib,1,RSTART+RLENGTH-1)}'
@@ -67,15 +70,19 @@ solib: ${solib}
 ${solib}: ${${solib}-objs}
 	${CC} ${$@-LDFLAGS} ${LDFLAGS-y} ${CFLAGS-y} -o $@ ${$@-objs} ${LIBS}
 
+clean::
+	rm -f ${solib}
 
-libripmime: ${OFILES} ripmime-api.o
-	ar ruvs libripmime.a ${OFILES}  ripmime-api.o
+ARFLAGS = ruvs
+libripmime.a: ${OFILES} ripmime-api.o
+	${AR} ${ARFLAGS} $@ ${OFILES} ripmime-api.o
+
+clean::
+	rm -f libripmime.a
 
 ripl: ripmime.a
 	${CC} ${CFLAGS} ripmime.c ripmime.a -o ripmime
 
-sco: ${OFILES}
-	${CC} ${CFLAGS} ripmime.c ${OFILES} -o ripmime -lsocket
 
 ripmime.o: buildcodes.h
 ripmime: ${OFILES} ripmime.o
@@ -83,6 +90,9 @@ ripmime: ${OFILES} ripmime.o
 
 riptest: ${OFILES}
 	${CC} ${LDFLAGS-y} ${CFLAGS-y} $@.c ${OFILES} -o $@
+
+clean::
+	rm -f ripmime riptest
 
 DESTDIR =
 prefix  = /usr/local
@@ -112,10 +122,16 @@ install-man:
 ffget_test: ffget_mmap_test.c ffget_mmap.[ch] logger.o ffget_mmap.o
 	${CC} ${LDFLAGS-y} ${CFLAGS-y} ffget_mmap_test.c logger.o ffget_mmap.o -o ffgt
 
-clean:
-	rm -f *.o *core ${OBJ} buildcodes.h
+.PHONY: clean
+clean::
+	rm -f *.o *core
 	rm -f tnef/*.o
 	rm -f ripOLE/*.o ripOLE/ripole
 
-MIMEH: MIME_headers.o strlower.o
-	${CC} ${CFLAGS} MIMEH_test.c MIME_headers.o strlower.o -o MIMEH_test
+.PHONY: MIMEH
+MIMEH: MIMEH_test
+MIMEH_test-objs = MIMEH_test.o MIME_headers.o strlower.o
+MIMEH_test: ${MIMEH_test-objs}
+	${CC} ${LDFLAGS-y} ${CFLAGS-y} ${$@-objs} -o $@
+clean::
+	rm -f MIMEH_test
