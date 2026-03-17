@@ -45,16 +45,28 @@ buildcodes.h:
 	./generate-buildcodes.sh
 
 ${RIPOLE_OBJS} tnef/tnef.o:
-	${MAKE} -C ${@D} ${@F}
+	${MAKE} -C ${@D} ${@F} CFLAGS="${CFLAGS} ${CFLAGS-y}"
 
 .c.o:
-	${CC} ${CFLAGS} $(COMPONENTS) -c $*.c
+	${CC} ${CFLAGS-y} ${COMPONENTS} -c $*.c
+
+CFLAGS-y   = ${CFLAGS}
+LDFLAGS-y  = ${LDFLAGS}
 
 all: ${OBJ} 
+solib          := libripmime.so.1.4.0
+solib-soname   != awk -vlib=${solib} -vsuffix="\\.so\\.[0-9]+" \
+	'BEGIN{match(lib,suffix);print substr(lib,1,RSTART+RLENGTH-1)}'
+solib-basename != awk -vlib=${solib} -vsuffix="\\.so" \
+	'BEGIN{match(lib,suffix);print substr(lib,1,RSTART+RLENGTH-1)}'
 
+${solib}-LDFLAGS  := -shared -Wl,-soname,${solib-soname}
+${solib}-objs     := ${OFILES} ripmime-api.o
 
-solib: ${OFILES} ripmime-api.o
-	gcc --shared -Wl,-soname,libripmime.so.1 ${OFILES} ripmime-api.o -o libripmime.so.1.4.0 -lc
+solib: ${solib}
+${solib}: ${${solib}-objs}
+	${CC} ${$@-LDFLAGS} ${LDFLAGS-y} ${CFLAGS-y} -o $@ ${$@-objs} ${LIBS}
+
 
 libripmime: ${OFILES} ripmime-api.o
 	ar ruvs libripmime.a ${OFILES}  ripmime-api.o
@@ -65,20 +77,32 @@ ripl: ripmime.a
 sco: ${OFILES}
 	${CC} ${CFLAGS} ripmime.c ${OFILES} -o ripmime -lsocket
 
-ripmime: ${OFILES} ripmime.c buildcodes.h
-	${CC} ${CFLAGS} $(COMPONENTS) ripmime.c ${OFILES} -o ripmime ${LIBS}
+ripmime.o: buildcodes.h
+ripmime: ${OFILES} ripmime.o
+	${CC} ${LDFLAGS-y} ${CFLAGS-y} ${COMPONENTS} $@.o -o $@ ${OFILES} ${LIBS}
 
 riptest: ${OFILES}
-	${CC} ${CFLAGS} riptest.c ${OFILES} -o riptest
+	${CC} ${LDFLAGS-y} ${CFLAGS-y} $@.c ${OFILES} -o $@
 
 DESTDIR =
 prefix  = /usr/local
   exec_prefix = ${prefix}
     bindir = ${exec_prefix}/bin
+    libdir = ${exec_prefix}/lib
   datarootdir = ${prefix}/share
     mandir = ${datarootdir}/man
 
 .PHONY: install install-exec install-man
+.PHONY: install-static install-shared install-headers
+
+install-static: libripmime.a
+	install -m444 -Dt ${DESTDIR}${libdir} libripmime.a
+
+install-shared: ${solib}
+	install -m555 -Dt ${DESTDIR}${libdir} ${solib}
+	ln -sf ${solib} ${DESTDIR}${libdir}/${solib-soname}
+	ln -sf ${solib} ${DESTDIR}${libdir}/${solib-basename}
+
 install: install-exec install-man
 install-exec: ${OBJ}
 	install -m555 -s -Dt ${DESTDIR}${bindir} ${OBJ}
@@ -86,8 +110,7 @@ install-man:
 	install -m444 -Dt ${DESTDIR}${mandir}/man1 ripmime.1
 
 ffget_test: ffget_mmap_test.c ffget_mmap.[ch] logger.o ffget_mmap.o
-	${CC} ${CFLAGS} ffget_mmap_test.c logger.o ffget_mmap.o -o ffgt
-
+	${CC} ${LDFLAGS-y} ${CFLAGS-y} ffget_mmap_test.c logger.o ffget_mmap.o -o ffgt
 
 clean:
 	rm -f *.o *core ${OBJ} buildcodes.h
