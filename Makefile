@@ -56,6 +56,9 @@ ${RIPOLE_OBJS} tnef/tnef.o:
 
 CFLAGS-y   = ${CFLAGS}
 LDFLAGS-y  = ${LDFLAGS}
+LDFLAGS-y += -Wl,-rpath,${libdir}
+
+CFLAGS-${use-solib}  += -fPIC
 
 solib          := libripmime.so.1.4.0
 solib-soname   != awk -vlib=${solib} -vsuffix="\\.so\\.[0-9]+" \
@@ -80,13 +83,14 @@ libripmime.a: ${OFILES} ripmime-api.o
 clean::
 	rm -f libripmime.a
 
-ripl: ripmime.a
-	${CC} ${CFLAGS} ripmime.c ripmime.a -o ripmime
-
+use-solib = n
+-lib := ${use-solib:y=${solib}} ${use-solib:n=libripmime.a}
+-lib := ${-lib:y=}
+-lib := ${-lib:n=}
 
 ripmime.o: buildcodes.h
-ripmime: ${OFILES} ripmime.o
-	${CC} ${LDFLAGS-y} ${CFLAGS-y} ${COMPONENTS} $@.o -o $@ ${OFILES} ${LIBS}
+ripmime: ${-lib} ripmime.o buildcodes.h
+	${CC} ${LDFLAGS-y} ${CFLAGS-y} ${COMPONENTS} $@.o -o $@ ${-lib} ${LIBS}
 
 riptest: ${OFILES}
 	${CC} ${LDFLAGS-y} ${CFLAGS-y} $@.c ${OFILES} -o $@
@@ -155,6 +159,8 @@ _ != { \
 	echo '    libdir = '${libdir:Q}$(call quote,libdir); \
 	echo '  datarootdir = '${datarootdir:Q}$(call quote,datarootdir); \
 	echo '    mandir = '${mandir:Q}$(call quote,mandir); \
+	echo; \
+	echo 'use-solib     = '${use-solib:Q}$(call quote,use-solib); \
 	} > .config
 include .config
 
