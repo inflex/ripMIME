@@ -45,11 +45,8 @@ debug: default
 buildcodes.h: 
 	./generate-buildcodes.sh
 
-ripOLE/ole.o:
-	./build_ripOLE
-
-tnef/tnef.o:
-	./build_tnef
+${RIPOLE_OBJS} tnef/tnef.o:
+	${MAKE} -C ${@D} ${@F}
 
 .c.o:
 	${CC} ${CFLAGS} $(COMPONENTS) -c $*.c
