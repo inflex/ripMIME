@@ -14,7 +14,7 @@ VERSION=0.1.15
 #	use our recommended settings.
 #CFLAGS ?= -Wall -g -O2 -Werror $(CPU_OPTS)
 #CFLAGS=-Wall -g -O2 -Wundef -Wshadow -Wsign-compare -I.
-CFLAGS=-Wall  -I. -O2 
+CFLAGS ?= -Wall -Wextra -O2
 
 # OLE decoding is still considered to be 'beta' mode - so it 
 #	disabled in the stable release of ripMIME for now
