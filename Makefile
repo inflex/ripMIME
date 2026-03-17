@@ -112,6 +112,7 @@ prefix  = /usr/local
 install-static: libripmime.a
 	install -m444 -Dt ${DESTDIR}${libdir} libripmime.a
 
+install-exec${use-solib:y=}: install-shared
 install-shared: ${solib}
 	install -m555 -Dt ${DESTDIR}${libdir} ${solib}
 	ln -sf ${solib} ${DESTDIR}${libdir}/${solib-soname}
