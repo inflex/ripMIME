@@ -135,3 +135,31 @@ MIMEH_test: ${MIMEH_test-objs}
 	${CC} ${LDFLAGS-y} ${CFLAGS-y} ${$@-objs} -o $@
 clean::
 	rm -f MIMEH_test
+
+# Macro to extract a quoted & unexpanded variable
+quote = '$(subst ','\'',$(value $1))'
+
+# Save and restore configuration variables
+-include .config
+_ != { \
+	echo 'AR      = '${AR:Q}$(call quote,AR); \
+	echo 'ARFLAGS = '${ARFLAGS:Q}$(call quote,ARFLAGS); \
+	echo 'CC      = '${CC:Q}$(call quote,CC); \
+	echo 'CFLAGS  = '${CFLAGS:Q}$(call quote,CFLAGS); \
+	echo 'LDFLAGS = '${LDFLAGS:Q}$(call quote,LDFLAGS); \
+	echo 'LIBS    = '${LIBS:Q}$(call quote,LIBS); \
+	echo; \
+	echo 'prefix = '${prefix:Q}$(call quote,prefix); \
+	echo '  exec_prefix = '${exec_prefix:Q}$(call quote,exec_prefix); \
+	echo '    bindir = '${bindir:Q}$(call quote,bindir); \
+	echo '    libdir = '${libdir:Q}$(call quote,libdir); \
+	echo '  datarootdir = '${datarootdir:Q}$(call quote,datarootdir); \
+	echo '    mandir = '${mandir:Q}$(call quote,mandir); \
+	} > .config
+include .config
+
+# FIXME: variables (unintuitivelly) are expanded when saving in bmake
+
+.PHONY: distclean
+distclean:: clean
+	rm -f .config
