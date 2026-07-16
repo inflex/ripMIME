@@ -1,13 +1,15 @@
 /*----------------------------------------
-* ripMIME -
+* ripMIME 
 *
 * Written by Paul L Daniels
 * pldaniels@pldaniels.com
 *
-* (C)2001 P.L.Daniels
-* http://www.pldaniels.com/ripmime
+* Copyright (c) 2026 Paul L. Daniels (pldaniels.com)
+*  SPDX-License-Identifier: PLD-1.0
+* Licence: https://pldaniels.com/licence
 *
 */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
