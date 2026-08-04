@@ -6,28 +6,20 @@
 #define LIBMIME_VERSION "200811050000"
 
 /* Exit Error codes */
-#define _EXITERR_UNDEFINED_BOUNDARY 100
-#define _EXITERR_PRINT_QUOTABLE_INPUT_NOT_OPEN 200
-#define _EXITERR_PRINT_QUOTABLE_OUTPUT_NOT_OPEN 201
-#define _EXITERR_BASE64_OUTPUT_NOT_OPEN 210
-#define _EXITERR_BASE64_UNABLE_TO_OUTPUT 211
-#define _EXITERR_MIMEREAD_CANNOT_OPEN_OUTPUT 220
-#define _EXITERR_MIMEREAD_CANNOT_WRITE_OUTPUT 221
-#define _EXITERR_MIMEREAD_CANNOT_OPEN_INPUT 222
-#define _EXITERR_MIMEUNPACK_CANNOT_OPEN_INPUT_FILE 230
-#define _EXITERR_MIMEUNPACK_CANNOT_OPEN_HEADERS_FILE 231
+#define _EXITERR_UNDEFINED_BOUNDARY						100
+#define _EXITERR_PRINT_QUOTABLE_INPUT_NOT_OPEN			200
+#define _EXITERR_PRINT_QUOTABLE_OUTPUT_NOT_OPEN			201
+#define _EXITERR_BASE64_OUTPUT_NOT_OPEN					210
+#define _EXITERR_BASE64_UNABLE_TO_OUTPUT				211
+#define _EXITERR_MIMEREAD_CANNOT_OPEN_OUTPUT			220
+#define _EXITERR_MIMEREAD_CANNOT_WRITE_OUTPUT			221
+#define _EXITERR_MIMEREAD_CANNOT_OPEN_INPUT				222
+#define _EXITERR_MIMEUNPACK_CANNOT_OPEN_INPUT_FILE		230
+#define _EXITERR_MIMEUNPACK_CANNOT_OPEN_HEADERS_FILE	231
 
-#define MIME_ERROR_RECURSION_LIMIT_REACHED 240
-#define MIME_ERROR_FFGET_EMPTY 241
-#define MIME_ERROR_B64_INPUT_STREAM_EOF 242
-
-#define _MIME_RENAME_METHOD_INFIX 1
-#define _MIME_RENAME_METHOD_PREFIX 2
-#define _MIME_RENAME_METHOD_POSTFIX 3
-#define _MIME_RENAME_METHOD_RANDINFIX 4
-#define _MIME_RENAME_METHOD_RANDPREFIX 5
-#define _MIME_RENAME_METHOD_RANDPOSTFIX 6
-
+#define MIME_ERROR_RECURSION_LIMIT_REACHED				240
+#define MIME_ERROR_FFGET_EMPTY							241
+#define MIME_ERROR_B64_INPUT_STREAM_EOF					242
 
 #define _MIME_STRLEN_MAX 1023
 
@@ -59,10 +51,7 @@
 int MIME_version( void );
 size_t MIME_read_raw( char *src_mpname, char *dest_mpname, size_t rw_buffer_size );
 int MIME_read( char *mpname ); /* returns filesize in KB */
-int MIME_unpack( char *unpackdir, char *mpname, int current_recusion_level );
-//int MIME_unpack_single( char *unpackdir, char *mpname, int current_recusion_level );
-//int MIME_unpack_single_fp( char *unpackdir, FILE *fi, int current_recusion_level );
-//int MIME_unpack_mailbox( char *unpackdir, char *mpname, int current_recursion_level );
+int MIME_unpack( RIPMIME_output *unpack_metadata, char *mpname, int current_recusion_level );
 int MIME_insert_Xheader( char *fname, char *xheader );
 int MIME_set_blankfileprefix( char *prefix );
 int MIME_set_recursion_level(int level);
@@ -108,15 +97,11 @@ int MIME_get_header_defect_count( void );
 int MIME_is_file_mime( char *fname );
 int MIME_is_file_uuenc( char *fname );
 
-
 char *MIME_get_blankfileprefix( void );
 char *MIME_get_headersname( void );
 char *MIME_get_subject( void );
-int MIME_init( void );
-int MIME_close( void );
+void MIME_init( void );
+void MIME_close( RIPMIME_output *unpack_metadata );
 int MIME_set_tmpdir( char *tmpdir );
-//int MIME_postdecode_cleanup( char *unpackdir, struct SS_object *ss );
-
-//int MIME_decode_TNEF( FILE *f, char *unpackdir, struct _header_info *hinfo, int keep );
 
 #endif

@@ -196,7 +196,7 @@ int LOGGER_clean_output( char *string, char **buffer )
 	int maxsize = slen *2;
 
 	// First up, allocate maxsize bytes for a temporary new string.
-	newstr = malloc(slen *2 +1); 
+	newstr = malloc(slen *2 +1);
 	if ( newstr == NULL )
 	{
 		// FIXME - Report an error here ... to -somewhere-

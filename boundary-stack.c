@@ -49,16 +49,16 @@ static struct BS_globals glb;
  Function Name	: BS_init
  Returns Type	: int
  	----Parameter List
-	1. void , 
+	1. void ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int BS_init( void )
 {
@@ -82,14 +82,14 @@ int BS_init( void )
  	----Parameter List
 	1. int limit , how many boundary strings to hold
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int BS_set_hold_limit( int limit )
 {
@@ -102,16 +102,16 @@ int BS_set_hold_limit( int limit )
  Function Name	: BS_set_verbose
  Returns Type	: int
  	----Parameter List
-	1. int level , 
+	1. int level ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int BS_set_verbose( int level )
 {
@@ -124,16 +124,16 @@ int BS_set_verbose( int level )
  Function Name	: BS_set_debug
  Returns Type	: int
  	----Parameter List
-	1. int level , 
+	1. int level ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int BS_set_debug( int level )
 {
@@ -146,16 +146,16 @@ int BS_set_debug( int level )
  Function Name	: BS_set_boundary_detect_limit
  Returns Type	: int
  	----Parameter List
-	1. int limit , 
+	1. int limit ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int BS_set_boundary_detect_limit( int limit )
 {
@@ -172,16 +172,16 @@ int BS_set_boundary_detect_limit( int limit )
  Function Name	: BS_clear
  Returns Type	: int
  	----Parameter List
-	1. void , 
+	1. void ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int BS_clear( void )
 {
@@ -209,16 +209,16 @@ int BS_clear( void )
  Function Name	: BS_non_hyphen_length
  Returns Type	: int
  	----Parameter List
-	1. char *boundary , 
+	1. char *boundary ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int BS_non_hyphen_length( char *boundary )
 {
@@ -234,28 +234,28 @@ int BS_non_hyphen_length( char *boundary )
  Function Name	: BS_push
  Returns Type	: int
  	----Parameter List
-	1. char *boundary , 
+	1. char *boundary ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int BS_push( char *boundary )
 {
 
 	struct BS_node *node;
 
-	if ((glb.hold_limit > 0)&&(glb.count >= glb.hold_limit)) 
+	if ((glb.hold_limit > 0)&&(glb.count >= glb.hold_limit))
 	{
 		DBS LOGGER_log("%s:%d:BS_push:DEBUG: Number of boundaries to hold is at limit (limit=%d)",FL,glb.hold_limit);
 		return 0;
 	}
-  
+
 	node	= malloc(sizeof(struct BS_node));
 
 	DBS LOGGER_log("%s:%d:BS_push:DEBUG: head = %p, nn = %p boundary = '%s'",FL, glb.boundarystack, node, boundary);
@@ -289,16 +289,16 @@ int BS_push( char *boundary )
  Function Name	: *BS_pop
  Returns Type	: char
  	----Parameter List
-	1. void , 
+	1. void ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 char *BS_pop( void )
 {
@@ -321,16 +321,16 @@ char *BS_pop( void )
  Function Name	: *BS_top
  Returns Type	: char
  	----Parameter List
-	1. void , 
+	1. void ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 char *BS_top( void )
 {
@@ -346,16 +346,16 @@ char *BS_top( void )
  Function Name	: BS_count
  Returns Type	: int
  	----Parameter List
-	1. void , 
+	1. void ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int BS_count( void )
 {
@@ -367,16 +367,16 @@ int BS_count( void )
  Function Name	: BS_is_long_enough
  Returns Type	: int
  	----Parameter List
-	1. int blen , 
+	1. int blen ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int BS_is_long_enough( int blen )
 {
@@ -390,17 +390,17 @@ int BS_is_long_enough( int blen )
  Function Name	: BS_boundary_detect
  Returns Type	: int
  	----Parameter List
-	1. char *needle, 
-	2.  char *haystack , 
+	1. char *needle,
+	2.  char *haystack ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int BS_boundary_detect( char *haystack, char *needle, int needle_length )
 {
@@ -434,8 +434,8 @@ int BS_boundary_detect( char *haystack, char *needle, int needle_length )
 		if (strncmp( needle, haystack_start, needle_length )==0)
 		{
 			DBS LOGGER_log("%s:%d:BS_boundary_detect:DEBUG: Hit on compare",FL);
-			result = 0;  
-			break; 
+			result = 0;
+			break;
 		}
 		haystack_start++;
 	}
@@ -454,13 +454,13 @@ int BS_boundary_detect( char *haystack, char *needle, int needle_length )
 	2.  int len , the length of the boundary
  	------------------
  Exit Codes	: 1 == boundary found, 0 == no boundary found
- Side Effects	: 
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int BS_cmp( char *boundary, int len )
 {
@@ -504,7 +504,7 @@ int BS_cmp( char *boundary, int len )
 	{
 //		if (node->boundary_length <= len)
 		if (node->boundary_nhl == nhl)
-		{	
+		{
 			DBS LOGGER_log("%s:%d:BS_cmp:DEBUG: Comparing '%s' to '%s'", FL, boundary, node->boundary);
 			// * 20040903-08H57:PLD: Set boundary length comparison from > 0 to >= 0
 			if ((node->boundary != NULL)&&(node->boundary_length >= 0))

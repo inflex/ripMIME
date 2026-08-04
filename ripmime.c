@@ -15,7 +15,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
 #include <errno.h>
@@ -26,9 +25,10 @@
 #include "buildcodes.h"
 #include "logger.h"
 #include "ffget.h"
+#include "mime_element.h"
 #include "mime.h"
 #include "strstack.h"
-#include "MIME_headers.h"
+#include "mime_headers.h"
 
 #define RIPMIME_ERROR_CANT_CREATE_OUTPUT_DIR 1
 #define RIPMIME_ERROR_CANT_OPEN_INPUT_FILE 2
@@ -38,8 +38,8 @@
 
 struct RIPMIME_globals
 {
-   char *inputfile;
-   char *dir;
+   char *input_path;
+   RIPMIME_output *output;
    int use_return_codes;
    int timeout;
    int quiet;
@@ -57,7 +57,7 @@ char help[] = "ripMIME -i <mime file> -d <directory>"
    "[-p prefix] [-e [header file]] [-vVh] [--version]"
    "[--no_nameless] [--unique_names [--prefix|--postfix|--infix|--randprefix|--randpostfix|--randinfix]]"
    "[--paranoid] [--mailbox] [--formdata] [--debug]"
-   "[--no-tnef] [--no-quotedprintable] [--no-uudecode]\n"
+   "[--no-quotedprintable] [--no-uudecode]\n"
    "Options available :\n"
    "-i : Input MIME encoded file (use '-' to input from STDIN)\n"
    "\tIf <mime file> is a directory, it will be recursed\n"
@@ -66,6 +66,8 @@ char help[] = "ripMIME -i <mime file> -d <directory>"
    "-e [headers file name] : Dump headers from mailpack (default '_headers_')\n"
    "-v : Turn on verbosity\n"
    "-q : Run quietly, do no report non-fatal errors\n"
+   "-l : list included mime fragments metadata to STDOUT delimited by '|' sign. Contains :\n"
+   "     internal id, attachment count, file count, recursion level, mime content type, file name\n"
    "\n"
    "--verbose-contenttype : Turn on verbosity of file content type\n"
    "--verbose-oldstyle : Uses the v1.2.x style or filename reporting\n"
@@ -91,7 +93,6 @@ char help[] = "ripMIME -i <mime file> -d <directory>"
    "--mailbox : Process mailbox file\n"
    "--formdata : Process as form data (from HTML form etc).  Inhibits conversion of NUL/zero-bytes to spaces\n"
    "\n"
-   "--no-tnef : Turn off TNEF/winmail.dat decoding\n"
    "--no-ole : Turn off OLE decoding\n"
    "--no-uudecode : Turns off the facility of detecting UUencoded attachments in emails\n"
    "--no-quotedprintable : Turns off the facility of decoding QuotedPrintable data\n"
@@ -184,14 +185,14 @@ int RIPMIME_parse_parameters (struct RIPMIME_globals *glb, int argc, char **argv
                case 'i':
                    if (argv[i][2] != '\0')
                    {
-                       glb->inputfile = &argv[i][2];
+                       glb->input_path = &argv[i][2];
                    }
                    else
                    {
                        i++;
                        if (i < argc)
                        {
-                           glb->inputfile = argv[i];
+                           glb->input_path = argv[i];
                        }
                        else
                        {
@@ -203,14 +204,14 @@ int RIPMIME_parse_parameters (struct RIPMIME_globals *glb, int argc, char **argv
                case 'd':
                    if (argv[i][2] != '\0')
                    {
-                       glb->dir = &(argv[i][2]);
+                       glb->output->dir = &(argv[i][2]);
                    }
                    else
                    {
                        i++;
                        if (i < argc)
                        {
-                           glb->dir = argv[i];
+                           glb->output->dir = argv[i];
                        }
                        else
                        {
@@ -264,6 +265,10 @@ int RIPMIME_parse_parameters (struct RIPMIME_globals *glb, int argc, char **argv
                    }
                    break;      // blankzone storage option
 #endif
+
+               case 'l':
+                   glb->output->unpack_mode = RIPMIME_UNPACK_MODE_LIST_MIME;
+                   break;
 
                case 'v':
                    MIME_set_verbosity (1);
@@ -319,40 +324,40 @@ int RIPMIME_parse_parameters (struct RIPMIME_globals *glb, int argc, char **argv
                        }
                        else if (strncmp (&(argv[i][2]), "prefix", 6) == 0)
                        {
-                           MIME_set_renamemethod (_MIME_RENAME_METHOD_PREFIX);
+                           glb->output->rename_method = _MIME_RENAME_METHOD_PREFIX;
                        }
                        else if (strncmp (&(argv[i][2]), "postfix", 7) == 0)
                        {
-                           MIME_set_renamemethod (_MIME_RENAME_METHOD_POSTFIX);
+                           glb->output->rename_method = _MIME_RENAME_METHOD_POSTFIX;
                        }
                        else if (strncmp (&(argv[i][2]), "infix", 5) == 0)
                        {
-                           MIME_set_renamemethod (_MIME_RENAME_METHOD_INFIX);
+                           glb->output->rename_method = _MIME_RENAME_METHOD_INFIX;
                        }
                        /* New methods of generating file name: add counter and random number*/
                        else if (strncmp (&(argv[i][2]), "randprefix", 10) == 0)
                        {
-                           MIME_set_renamemethod (_MIME_RENAME_METHOD_RANDPREFIX);
+                           glb->output->rename_method = _MIME_RENAME_METHOD_RANDPREFIX;
                        }
                        else if (strncmp (&(argv[i][2]), "randpostfix", 11) == 0)
                        {
-                           MIME_set_renamemethod (_MIME_RENAME_METHOD_RANDPOSTFIX);
+                           glb->output->rename_method = _MIME_RENAME_METHOD_RANDPOSTFIX;
                        }
                        else if (strncmp (&(argv[i][2]), "randinfix", 9) == 0)
                        {
-                           MIME_set_renamemethod (_MIME_RENAME_METHOD_RANDINFIX);
+                           glb->output->rename_method = _MIME_RENAME_METHOD_RANDINFIX;
                        }
                        else if (strncmp (&(argv[i][2]), "overwrite", 9) == 0)
                        {
-                           MIME_set_uniquenames (0);
+                           glb->output->unique_names = 0;
                        }
                        else if (strncmp (&(argv[i][2]), "unique_names", 12) == 0)
                        {
-                           MIME_set_uniquenames (1);
+                           glb->output->unique_names = 1;
                        }
                        else if (strncmp (&(argv[i][2]), "unique-names", 12) == 0)
                        {
-                           MIME_set_uniquenames (1);
+                           glb->output->unique_names = 1;
                        }
                        else if (strncmp(&(argv[i][2]), "name-by-type", 12) == 0)
                        {
@@ -405,10 +410,6 @@ int RIPMIME_parse_parameters (struct RIPMIME_globals *glb, int argc, char **argv
                        else if (strncmp (&(argv[i][2]), "no-uudecode", 11) == 0)
                        {
                            MIME_set_decode_uudecode(0);
-                       }
-                       else if (strncmp (&(argv[i][2]), "no-tnef", 7) == 0)
-                       {
-                           MIME_set_decode_tnef (0);
                        }
                        else if (strncmp (&(argv[i][2]), "no-ole", 6) == 0)
                        {
@@ -512,7 +513,6 @@ int RIPMIME_parse_parameters (struct RIPMIME_globals *glb, int argc, char **argv
 }
 
 
-
 /*-----------------------------------------------------------------\
 Function Name  : RIPMIME_init
 Returns Type   : int
@@ -528,16 +528,19 @@ Comments:
 Changes:
 
 \------------------------------------------------------------------*/
-int RIPMIME_init (struct RIPMIME_globals *glb)
+int RIPMIME_init (struct RIPMIME_globals *glb, RIPMIME_output *o)
 {
-   glb->dir = defaultdir;
-   glb->inputfile = NULL;
+   glb->output = o;
+   glb->output->dir = defaultdir;
+   glb->output->unpack_mode = RIPMIME_UNPACK_MODE_TO_DIRECTORY;
+   glb->output->rename_method = _MIME_RENAME_METHOD_INFIX;
+   glb->output->unique_names = 1;
+   glb->input_path = NULL;
    glb->use_return_codes = 0;
    glb->timeout = 0;
    glb->quiet = 0;
    glb->verbose_defects = 0;
    glb->verbose = 0;
-
    return 0;
 }
 
@@ -558,7 +561,7 @@ Changes:
 \------------------------------------------------------------------*/
 void RIPMIME_signal_alarm( int sig )
 {
-   if (ripmime_globals->quiet == 0) LOGGER_log("%s:%d:RIPMIME_signal_alarm: ripMIME took too long to complete. Mailpack is \"%s\", output dir is \"%s\"",FL, ripmime_globals->inputfile, ripmime_globals->dir );
+   if (ripmime_globals->quiet == 0) LOGGER_log("%s:%d:RIPMIME_signal_alarm: ripMIME took too long to complete. Mailpack is \"%s\", output dir is \"%s\"",FL, ripmime_globals->input_path, ripmime_globals->output->dir );
    exit(RIPMIME_ERROR_TIMEOUT);
 }
 
@@ -589,12 +592,11 @@ int RIPMIME_unpack_single( struct RIPMIME_globals *glb, char *fname )
        alarm(glb->timeout);
    }
 
-   MIMEH_set_outputdir (glb->dir);
-   result = MIME_unpack (glb->dir, fname, 0);
+   result = MIME_unpack (glb->output, fname, 0);
 
    // do any last minute things
 
-   MIME_close ();
+   MIME_close (glb->output);
 
    return result;
 }
@@ -623,8 +625,8 @@ int RIPMIME_unpack( struct RIPMIME_globals *glb )
 
    /** If we're not inputting from STDIN, check to see if the
      ** input is a directory **/
-   if (strcmp(glb->inputfile,"-")!=0) {
-       stat_result = stat(glb->inputfile, &st);
+   if (strcmp(glb->input_path,"-")!=0) {
+       stat_result = stat(glb->input_path, &st);
        if (stat_result != 0) return -1;
 
        if (S_ISDIR(st.st_mode)) input_is_directory = 1;
@@ -636,7 +638,7 @@ int RIPMIME_unpack( struct RIPMIME_globals *glb )
        struct dirent *dir_entry;
 
        fprintf(stderr,"input file is a directory, recursing\n");
-       dir = opendir(glb->inputfile);
+       dir = opendir(glb->input_path);
        if (dir == NULL) return -1;
 
        do {
@@ -650,7 +652,7 @@ int RIPMIME_unpack( struct RIPMIME_globals *glb )
            if (strcmp(dir_entry->d_name, ".")==0) continue;
            if (strcmp(dir_entry->d_name, "..")==0) continue;
 
-           snprintf(fullfilename,sizeof(fullfilename),"%s/%s", glb->inputfile, dir_entry->d_name);
+           snprintf(fullfilename,sizeof(fullfilename),"%s/%s", glb->input_path, dir_entry->d_name);
            stat_result = stat( fullfilename, &st );
            if (stat_result != 0) continue;
            if (S_ISREG(st.st_mode)) {
@@ -664,7 +666,7 @@ int RIPMIME_unpack( struct RIPMIME_globals *glb )
 
    } else {
        /** If the supplied file was actually a normal file, then decode normally **/
-       result = RIPMIME_unpack_single( glb, glb->inputfile );
+       result = RIPMIME_unpack_single( glb, glb->input_path );
    }
    return result;
 }
@@ -688,6 +690,7 @@ Changes:
 int main (int argc, char **argv)
 {
    struct RIPMIME_globals glb;
+   RIPMIME_output mime_output;
    int result = 0;
 
    /* if the user has just typed in "ripmime" and nothing else, then we had better give them
@@ -713,42 +716,37 @@ int main (int argc, char **argv)
    // Perform system initialisations
 
    MIME_init ();
-   RIPMIME_init (&glb);
+   RIPMIME_init (&glb, &mime_output);
 
    // Setup our default behaviours */
 
-   MIME_set_uniquenames (1);
    MIME_set_paranoid (0);
    MIME_set_header_longsearch(1); // 20040310-0117:PLD - Added by default as it seems stable, use --disable-qmail-bounce to turn off
-   MIME_set_renamemethod (_MIME_RENAME_METHOD_INFIX);
-
 
    RIPMIME_parse_parameters (&glb, argc, argv);
 
-
    // if our input filename wasn't specified, then we better let the user know!
-   if (!glb.inputfile)
+   if (!glb.input_path)
    {
-       LOGGER_log("Error: No input file was specified\n");
+       LOGGER_log("Error: No input path or file was specified\n");
        return RIPMIME_ERROR_NO_INPUT_FILE;
    }
 
    // Fire up the randomizer
-
    srand (time (NULL));
 
    // clean up the output directory name if required (remove any trailing /'s, as suggested by James Cownie 03/02/2001
 
-   if (glb.dir[strlen (glb.dir) - 1] == '/')
+   if (glb.output->dir[strlen (glb.output->dir) - 1] == '/')
    {
-       glb.dir[strlen (glb.dir) - 1] = '\0';
+       glb.output->dir[strlen (glb.output->dir) - 1] = '\0';
    }
 
    // Create the output directory required as specified by the -d parameter
 
-   if (glb.dir != defaultdir)
+   if (glb.output->dir != defaultdir)
    {
-       result = mkdir (glb.dir, S_IRWXU);
+       result = mkdir (glb.output->dir, S_IRWXU);
 
        // if we had a problem creating a directory, and it wasn't just
        // due to the directory already existing, then we have a bit of
@@ -758,7 +756,7 @@ int main (int argc, char **argv)
        if ((result == -1) && (errno != EEXIST))
        {
            LOGGER_log("ripMIME: Cannot create directory '%s' (%s)\n",
-                   glb.dir, strerror (errno));
+                   glb.output->dir, strerror (errno));
 
            return RIPMIME_ERROR_CANT_CREATE_OUTPUT_DIR;
        }

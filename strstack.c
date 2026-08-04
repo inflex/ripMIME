@@ -1,3 +1,5 @@
+/* STRING STACK IMPLEMEMNTATION */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,17 +20,17 @@
 /*-----------------------------------------------------------------\
  Function Name	: SS_init
  Returns Type	: int
- 	----Parameter List
-	1. void , 
- 	------------------
- Exit Codes	: 
- Side Effects	: 
+	----Parameter List
+	1. void ,
+	------------------
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int SS_init( struct SS_object *ss )
 {
@@ -43,17 +45,17 @@ int SS_init( struct SS_object *ss )
 /*-----------------------------------------------------------------\
  Function Name	: SS_set_verbose
  Returns Type	: int
- 	----Parameter List
-	1. int level , 
- 	------------------
- Exit Codes	: 
- Side Effects	: 
+	----Parameter List
+	1. int level ,
+	------------------
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int SS_set_verbose( struct SS_object *ss, int level )
 {
@@ -66,16 +68,16 @@ int SS_set_verbose( struct SS_object *ss, int level )
  Function Name	: SS_set_debug
  Returns Type	: int
  	----Parameter List
-	1. int level , 
+	1. int level ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int SS_set_debug( struct SS_object *ss, int level )
 {
@@ -88,16 +90,16 @@ int SS_set_debug( struct SS_object *ss, int level )
  Function Name	: SS_done
  Returns Type	: int
  	----Parameter List
-	1. void , 
+	1. void ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int SS_done( struct SS_object *ss )
 {
@@ -125,16 +127,16 @@ int SS_done( struct SS_object *ss )
  Function Name	: SS_dump
  Returns Type	: int
  	----Parameter List
-	1. struct SS_object *ss , 
+	1. struct SS_object *ss ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int SS_dump( struct SS_object *ss )
 {
@@ -153,22 +155,20 @@ int SS_dump( struct SS_object *ss )
  Function Name	: SS_push
  Returns Type	: int
  	----Parameter List
-	1. char *string , 
+	1. char *string ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int SS_push( struct SS_object *ss, char *data, size_t data_length )
 {
-
 	struct SS_node *node = malloc(sizeof(struct SS_node));
-
 
 	if (node)
 	{
@@ -191,21 +191,20 @@ int SS_push( struct SS_object *ss, char *data, size_t data_length )
 /*-----------------------------------------------------------------\
  Function Name	: *SS_pop
  Returns Type	: char
- 	----Parameter List
-	1. void , 
- 	------------------
- Exit Codes	: 
- Side Effects	: 
+	----Parameter List
+	1. void ,
+	------------------
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 char *SS_pop( struct SS_object *ss )
 {
-
 	struct SS_node *node = ss->stringstack;
 
 	if ((ss->stringstack)&&(ss->count > 0))
@@ -223,21 +222,20 @@ char *SS_pop( struct SS_object *ss )
 /*-----------------------------------------------------------------\
  Function Name	: *SS_top
  Returns Type	: char
- 	----Parameter List
-	1. void , 
- 	------------------
- Exit Codes	: 
- Side Effects	: 
+	----Parameter List
+	1. void ,
+	------------------
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 char *SS_top( struct SS_object *ss )
 {
-
 	if (ss->stringstack)
 	{
 		return ss->stringstack->data;
@@ -248,17 +246,17 @@ char *SS_top( struct SS_object *ss )
 /*-----------------------------------------------------------------\
  Function Name	: SS_count
  Returns Type	: int
- 	----Parameter List
-	1. void , 
- 	------------------
- Exit Codes	: 
- Side Effects	: 
+	----Parameter List
+	1. void ,
+	------------------
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 int SS_count( struct SS_object *ss )
 {
@@ -269,17 +267,17 @@ int SS_count( struct SS_object *ss )
  Function Name	: *SS_cmp
  Returns Type	: char
  	----Parameter List
-	1. struct SS_object *ss, 
-	2.  char *find_me , 
+	1. struct SS_object *ss,
+	2.  char *find_me ,
  	------------------
- Exit Codes	: 
- Side Effects	: 
+ Exit Codes	:
+ Side Effects	:
 --------------------------------------------------------------------
  Comments:
- 
+
 --------------------------------------------------------------------
  Changes:
- 
+
 \------------------------------------------------------------------*/
 char *SS_cmp( struct SS_object *ss, char *find_me, size_t find_me_len )
 {

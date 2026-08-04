@@ -10,26 +10,26 @@
 #define OLEER_NOT_OLE_FILE 102
 #define OLEER_INSANE_OLE_FILE 103
 
-#define OLEER_DECODE_NULL_OBJECT					10
+#define OLEER_DECODE_NULL_OBJECT				10
 #define OLEER_DECODE_NULL_FILENAME				11
 #define OLEER_DECODE_NULL_PATH					12
 
 #define OLEER_MINIFAT_READ_FAIL					30
 #define OLEER_PROPERTIES_READ_FAIL				31
 #define OLEER_MINISTREAM_READ_FAIL				32
-#define OLEER_MINISTREAM_STREAM_READ_FAIL    33
-#define OLEER_NORMALSTREAM_STREAM_READ_FAIL  34
+#define OLEER_MINISTREAM_STREAM_READ_FAIL  		33
+#define OLEER_NORMALSTREAM_STREAM_READ_FAIL		34
 
-#define OLEER_GET_BLOCK_SEEK						41
-#define OLEER_GET_BLOCK_READ						42
+#define OLEER_GET_BLOCK_SEEK					41
+#define OLEER_GET_BLOCK_READ					42
 
-#define OLEER_MEMORY_OVERFLOW						50
+#define OLEER_MEMORY_OVERFLOW					50
 
-#define OLE_VERBOSE_NORMAL 1
-#define OLE_VERBOSE_FATREAD 2
-#define OLE_VERBOSE_DIRREAD 4
-#define OLE_VERBOSE_STREAMREAD 8
-#define OLE_VERBOSE_STREAMDECODE 16
+#define OLE_VERBOSE_NORMAL			1
+#define OLE_VERBOSE_FATREAD			2
+#define OLE_VERBOSE_DIRREAD			4
+#define OLE_VERBOSE_STREAMREAD		8
+#define OLE_VERBOSE_STREAMDECODE	16
 
 #define OLE_VNORMAL(x) ((x) && OLE_VERBOSE_NORMAL == OLE_VERBOSE_NORMAL )
 
@@ -38,7 +38,6 @@
 
 #define OLE_DNORMAL(x) ((x) && OLE_DEBUG_NORMAL == OLE_DEBUG_NORMAL)
 #define OLE_DPEDANTIC(x) ((x) && OLE_DEBUG_PEDANTIC == OLE_DEBUG_PEDANTIC)
-
 
 #define OLE_HEADER_FAT_SECTOR_COUNT_LIMIT 109
 struct OLE_header {
@@ -59,9 +58,9 @@ struct OLE_header {
 		unsigned int FAT[OLE_HEADER_FAT_SECTOR_COUNT_LIMIT];
 };
 
-#define OLE_DIRECTORY_ELEMENT_NAME_SIZE 64
-#define OLE_DIRECTORY_CLASS_SIZE 16
-#define OLE_DIRECTORY_TIMESTAMPS_SIZE 16
+#define OLE_DIRECTORY_ELEMENT_NAME_SIZE		64
+#define OLE_DIRECTORY_CLASS_SIZE			16
+#define OLE_DIRECTORY_TIMESTAMPS_SIZE		16
 struct OLE_directory_entry {
 	char element_name[OLE_DIRECTORY_ELEMENT_NAME_SIZE];
 	int element_name_byte_count;
@@ -80,11 +79,9 @@ struct OLE_directory_entry {
 	unsigned int stream_size;
 };
 
-
 	
 #define OLE_HEADER_BLOCK_SIZE 512
 struct OLE_object {
-
 	int error;
 	size_t file_size;
 	int last_sector;
@@ -116,10 +113,7 @@ struct OLE_object {
 	int decode_normal_streams;
 
 	int (*filename_report_fn)(char *);
-
 };
-
-
 
 // Prototypes
 
@@ -147,9 +141,9 @@ int OLE_follow_minichain( struct OLE_object *ole, int miniFAT_sector_start );
 unsigned char *OLE_load_minichain( struct OLE_object *ole, int miniFAT_sector_start );
 unsigned char *OLE_load_chain( struct OLE_object *ole, int FAT_sector_start );
 int OLE_open_file( struct OLE_object *ole, char *fullpath );
-int OLE_decode_file( struct OLE_object *ole, char *fname, char *decode_path );
-int OLE_decode_file_done( struct OLE_object *ole );
-
+int OLE_decode_diskfile( struct OLE_object *ole, char *fname, RIPMIME_output *unpack_metadata );
+int OLE_decode_file( struct OLE_object *ole, FILE *f, RIPMIME_output *unpack_metadata );
+void OLE_decode_done( struct OLE_object *ole );
 
 // Our callbacks.
 int OLE_set_filename_report_fn( struct OLE_object *ole, int (*ptr_to_fn)(char *) );

@@ -34,8 +34,6 @@
 #include <syslog.h>
 #include <ctype.h>
 #include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <time.h>
 #include <errno.h>
@@ -49,6 +47,9 @@
 #include "pldstr.h"
 #include "boundary-stack.h"
 #include "ffget.h"
+#include "strstack.h"
+#include "mime_element.h"
+#include "mime_headers.h"
 #include "mime.h"
 #include "tnef/tnef_api.h"
 #include "ripOLE/ole.h"
@@ -56,31 +57,34 @@
 #include "uuencode.h"
 #include "filename-filters.h"
 #include "logger.h"
-#include "strstack.h"
 
-#include "MIME_headers.h"
 
-int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hinfo, int current_recursion_level, struct SS_object *ss );
-int MIME_unpack_single( char *unpackdir, char *mpname, int current_recursion_level, struct SS_object *ss );
-int MIME_unpack_single_fp( char *unpackdir, FILE *fi, int current_recursion_level, struct SS_object *ss );
-int MIME_unpack_mailbox( char *unpackdir, char *mpname, int current_recursion_level, struct SS_object *ss );
-int MIME_handle_multipart( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *h, int current_recursion_level, struct SS_object *ss );
-int MIME_handle_rfc822( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *h, int current_recursion_level, struct SS_object *ss );
+int MIME_unpack_stage2( FFGET_FILE *input_f, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *hinfo, int current_recursion_level, struct SS_object *ss );
+int MIME_unpack_single_diskfile( RIPMIME_output *unpack_metadata, char *mpname, int current_recursion_level, struct SS_object *ss );
+int MIME_unpack_single_file( RIPMIME_output *unpack_metadata, FILE *fi, int current_recursion_level, struct SS_object *ss );
+int MIME_unpack_mailbox( RIPMIME_output *unpack_metadata, char *mpname, int current_recursion_level, struct SS_object *ss );
+int MIME_handle_multipart( MIME_element* parent_mime, FFGET_FILE *input_f, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *h, int current_recursion_level, struct SS_object *ss );
+int MIME_handle_rfc822( MIME_element* parent_mime, FFGET_FILE *input_f, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *h, int current_recursion_level, struct SS_object *ss );
+
+MIME_element* MIME_decode_std_raw(  MIME_element* parent, FFGET_FILE *f, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *hinfo);
+MIME_element* MIME_decode_std_text( MIME_element* parent, FFGET_FILE *f, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *hinfo );
+MIME_element* MIME_decode_std_64(   MIME_element* parent, FFGET_FILE *f, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *hinfo );
+
 
 // Predefined filenames
 #define MIME_BLANKZONE_FILENAME_DEFAULT "_blankzone_"
 #define MIME_HEADERS_FILENAME "_headers_"
 
 #ifndef FL
-#define FL __FILE__, __LINE__
+#define FL __FILE__,__LINE__
 #endif
 
-#define _ENC_UNKNOWN 0
-#define _ENC_BASE64 1
-#define _ENC_PLAINTEXT 2
-#define _ENC_QUOTED 3
-#define _ENC_EMBEDDED 4
-#define _ENC_NOFILE -1
+#define _ENC_UNKNOWN			0
+#define _ENC_BASE64				1
+#define _ENC_PLAINTEXT			2
+#define _ENC_QUOTED				3
+#define _ENC_EMBEDDED			4
+#define _ENC_NOFILE				-1
 #define _MIME_CHARS_PER_LINE 32
 #define _MIME_MAX_CHARS_PER_LINE 76
 #define _RECURSION_LEVEL_DEFAULT 20
@@ -95,8 +99,6 @@ int MIME_handle_rfc822( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
 #define _MIME_WRITE_BUFFER_SIZE (8 *1024)
 #define _MIME_WRITE_BUFFER_LIMIT (_MIME_WRITE_BUFFER_SIZE -4)
 
-
-
 // Debug precodes
 #define MIME_DPEDANTIC ((glb.debug >= _MIME_DEBUG_PEDANTIC))
 #define MIME_DNORMAL   ((glb.debug >= _MIME_DEBUG_NORMAL  ))
@@ -104,18 +106,16 @@ int MIME_handle_rfc822( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
 #define MIME_VERBOSE_12   ((glb.verbosity_12x_style > 0 ))
 #define DMIME if (glb.debug >= _MIME_DEBUG_NORMAL)
 
-#define FL __FILE__,__LINE__
-
 /* our base 64 decoder table */
-static unsigned char b64[256]={
-    128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,\
+static unsigned char b64[256] = {
+        128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,\
         128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,\
         128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,   62,  128,  128,  128,   63,\
-        52,   53,   54,   55,   56,   57,   58,   59,   60,   61,  128,  128,  128,    0,  128,  128,\
+        52,    53,   54,   55,   56,   57,   58,   59,   60,   61,  128,  128,  128,    0,  128,  128,\
         128,    0,    1,    2,    3,    4,    5,    6,    7,    8,    9,   10,   11,   12,   13,   14,\
-        15,   16,   17,   18,   19,   20,   21,   22,   23,   24,   25,  128,  128,  128,  128,  128,\
+        15,    16,   17,   18,   19,   20,   21,   22,   23,   24,   25,  128,  128,  128,  128,  128,\
         128,   26,   27,   28,   29,   30,   31,   32,   33,   34,   35,   36,   37,   38,   39,   40,\
-        41,   42,   43,   44,   45,   46,   47,   48,   49,   50,   51,  128,  128,  128,  128,  128,\
+        41,    42,   43,   44,   45,   46,   47,   48,   49,   50,   51,  128,  128,  128,  128,  128,\
         128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,\
         128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,\
         128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,\
@@ -126,11 +126,7 @@ static unsigned char b64[256]={
         128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128,  128 \
 };
 
-
-
-
 struct MIME_globals {
-
     int header_defect_count;
     int filecount;
     char blankfileprefix[_MIME_STRLEN_MAX];
@@ -144,11 +140,9 @@ struct MIME_globals {
     int quiet;
     int syslogging;
     int stderrlogging;
-    int unique_names;
-    int rename_method;
     char headersname[_MIME_STRLEN_MAX];
     char tempdirectory[_MIME_STRLEN_MAX];
-    int save_headers;
+    int dump_headers;
     int attachment_count;
     int current_line;
     int no_nameless;
@@ -169,7 +163,7 @@ struct MIME_globals {
 
     int blankzone_saved;
     int blankzone_save_option;
-    char blankzone_filename[_MIMEH_STRLEN_MAX +1];
+    char blankzone_filename[_MIMEH_STRLEN_MAX + 1];
 
     int (*filename_decoded_reporter)(char *, char *); // Pointer to the reporting function for filenames as they are decoded
 
@@ -183,12 +177,6 @@ struct MIME_globals {
 };
 
 static struct MIME_globals glb;
-
-//char OK[]="OKAY";
-static char scratch[1024];
-
-/* File pointer for the headers output */
-FILE *headers;
 
 /*-----------------------------------------------------------------\
   Function Name : MIME_version
@@ -243,7 +231,6 @@ Changes:
 int MIME_set_name_by_type( int level )
 {
     glb.name_by_type = level;
-
     return glb.name_by_type;
 }
 
@@ -265,6 +252,7 @@ int MIME_set_debug( int level )
     MDECODE_set_debug(level);
     UUENCODE_set_debug(level);
     FNFILTER_set_debug(level);
+    MIMEELEMENT_set_debug(level);
     return glb.debug;
 }
 
@@ -312,28 +300,6 @@ int MIME_set_recursion_level( int level )
     return glb.max_recursion_level;
 }
 
-/*-----------------------------------------------------------------\
-  Function Name : MIME_set_decode_tnef
-  Returns Type  : int
-  ----Parameter List
-  1. int level ,
-  ------------------
-  Exit Codes    :
-  Side Effects  :
-  --------------------------------------------------------------------
-Comments:
-
---------------------------------------------------------------------
-Changes:
-
-\------------------------------------------------------------------*/
-int MIME_set_decode_tnef( int level )
-{
-    glb.decode_tnef = level;
-    TNEF_set_decode( level );
-
-    return level;
-}
 /*-----------------------------------------------------------------\
   Function Name : MIME_set_decode_ole
   Returns Type  : int
@@ -675,7 +641,7 @@ int MIME_set_filename_report_fn( int (*ptr_to_fn)(char *, char *) )
 int MIME_set_dumpheaders( int level )
 {
 
-    glb.save_headers = level;
+    glb.dump_headers = level;
 
     return 0;
 }
@@ -772,7 +738,7 @@ int MIME_set_blankzone_save_option( int option )
             break;
 
         default:
-            LOGGER_log("%s:%d:MIME_set_blankzone_save_option:WARNING: Unknown option for saving method (%d). Setting to '%s'",FL, option, MIME_BLANKZONE_FILENAME_DEFAULT );
+            LOGGER_log("%s:%d:%s:WARNING: Unknown option for saving method (%d). Setting to '%s'",FL,__func__, option, MIME_BLANKZONE_FILENAME_DEFAULT );
             glb.blankzone_save_option = MIME_BLANKZONE_SAVE_FILENAME;
             snprintf( glb.blankzone_filename, _MIME_STRLEN_MAX, "%s", MIME_BLANKZONE_FILENAME_DEFAULT );
     }
@@ -835,19 +801,6 @@ int MIME_set_no_nameless( int level )
 }
 
 /*------------------------------------------------------------------------
-Procedure:     MIME_set_uniquenames ID:1
-Purpose:
-Input:
-Output:
-Errors:
-------------------------------------------------------------------------*/
-int MIME_set_uniquenames( int level )
-{
-    glb.unique_names = level;
-    return 0;
-}
-
-/*------------------------------------------------------------------------
 Procedure:     MIME_set_noparanoid ID:1
 Purpose:       If set, will prevent MIME from clobbering what it considers
 to be non-safe characters in the file name.
@@ -875,28 +828,6 @@ int MIME_set_mailboxformat( int level )
 {
     glb.mailbox_format = level;
     MIMEH_set_mailbox( level );
-    return 0;
-}
-
-/*------------------------------------------------------------------------
-Procedure:     MIME_set_renamemethod ID:1
-Purpose:
-Input:
-Output:
-Errors:
-------------------------------------------------------------------------*/
-int MIME_set_renamemethod( int method )
-{
-    if (( method >= _MIME_RENAME_METHOD_INFIX ) && ( method <= _MIME_RENAME_METHOD_RANDPOSTFIX ))
-    {
-        glb.rename_method = method;
-    }
-    else
-    {
-        LOGGER_log("%s:%d:MIME_set_renamemethod:ERROR: selected method not within %d > x > %d range", FL, _MIME_RENAME_METHOD_INFIX, _MIME_RENAME_METHOD_POSTFIX );
-        return -1;
-    }
-
     return 0;
 }
 
@@ -932,168 +863,45 @@ int MIME_get_attachment_count( void )
     return glb.attachment_count;
 }
 
-int get_random_value(void) {
-    int randval;
-    FILE *fp;
-    fp = fopen("/dev/urandom", "r");
-    fread(&randval, sizeof(randval), 1, fp);
-    fclose(fp);
-    if (randval < 0) { randval = randval *( -1); };
-    return randval;
-}
-
 /*------------------------------------------------------------------------
-Procedure:     MIME_test_uniquename ID:1
-Purpose:       Checks to see that the filename specified is unique. If it's not
-unique, it will modify the filename
-Input:         char *path: Path in which to look for similar filenames
-char *fname: Current filename
-int method: Method of altering the filename (infix, postfix, prefix, randinfix, randpostfix, randprefix)
-Output:
-Errors:
-------------------------------------------------------------------------*/
-int MIME_test_uniquename( char *path, char *fname, int method )
-{
-    struct stat buf;
-
-    char newname[_MIME_STRLEN_MAX +1];
-    char scr[_MIME_STRLEN_MAX +1]; /** Scratch var **/
-    char *frontname, *extention;
-
-    int cleared = 0;
-    int count = 1;
-
-    int randval = get_random_value();
-
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_test_uniquename:DEBUG: Start (%s)",FL,fname);
-
-    frontname = extention = NULL;  // shuts the compiler up
-
-    if (method == _MIME_RENAME_METHOD_INFIX)
-    {
-        PLD_strncpy(scr,fname, _MIMEH_STRLEN_MAX);
-        frontname = scr;
-        extention = strrchr(scr,'.');
-
-        if (extention)
-        {
-            *extention = '\0';
-            extention++;
-        }
-        else
-        {
-            method = _MIME_RENAME_METHOD_POSTFIX;
-        }
-    }
-
-  if (method == _MIME_RENAME_METHOD_RANDINFIX)
-    {
-        PLD_strncpy(scr,fname, _MIMEH_STRLEN_MAX);
-        frontname = scr;
-        extention = strrchr(scr,'.');
-
-        if (extention)
-        {
-            *extention = '\0';
-            extention++;
-        }
-        else
-        {
-            method = _MIME_RENAME_METHOD_RANDPOSTFIX;
-        }
-    }
-
-    snprintf(newname,_MIME_STRLEN_MAX,"%s/%s",path,fname);
-    while (!cleared)
-    {
-        if ((stat(newname, &buf) == -1))
-        {
-            cleared++;
-        }
-        else
-        {
-            if (method == _MIME_RENAME_METHOD_PREFIX)
-            {
-                snprintf(newname,_MIME_STRLEN_MAX,"%s/%d_%s",path,count,fname);
-            }
-            else
-                if (method == _MIME_RENAME_METHOD_INFIX)
-                {
-                    snprintf(newname,_MIME_STRLEN_MAX,"%s/%s_%d.%s",path,frontname,count,extention);
-                }
-                else
-                    if (method == _MIME_RENAME_METHOD_POSTFIX)
-                    {
-                        snprintf(newname,_MIME_STRLEN_MAX,"%s/%s_%d",path,fname,count);
-                    }
-                    else
-                        /* Handle randome methots*/
-                        if (method == _MIME_RENAME_METHOD_RANDPREFIX)
-                        {
-                            snprintf(newname,_MIME_STRLEN_MAX,"%s/%d_%d_%s",path,count,randval,fname);
-                        }
-                        else
-                            if (method == _MIME_RENAME_METHOD_RANDINFIX)
-                            {
-                                snprintf(newname,_MIME_STRLEN_MAX,"%s/%s_%d_%d.%s",path,frontname,count,randval,extention);
-                            }
-                            else
-                                if (method == _MIME_RENAME_METHOD_RANDPOSTFIX)
-                                {
-                                    snprintf(newname,_MIME_STRLEN_MAX,"%s/%s_%d_%d",path,fname,count,randval);
-                                }
-            count++;
-        }
-    }
-    if (count > 1)
-    {
-        frontname = strrchr(newname,'/');
-        if (frontname) frontname++;
-        else frontname = newname;
-
-        PLD_strncpy(fname, frontname, _MIMEH_FILENAMELEN_MAX); //FIXME - this assumes that the buffer space is at least MIME_STRLEN_MAX sized.
-    }
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_test_uniquename:DEBUG: Done (%s)",FL,fname);
-    return 0;
-}
-
-/*------------------------------------------------------------------------
-Procedure:     MIME_is_file_mime ID:1
+Procedure:     MIME_is_RFC
 Purpose:       Determines if the file handed to it is a MIME type email file.
 
-Input:         file name to analyze
-Output:        Returns 0 for NO, 1 for YES, -1 for "Things di
+Input:         FILE object to analyze
+Output:        0 if not RFC,
+               1 if the file represents RFC content,
+               -1 oherwise
 Errors:
 ------------------------------------------------------------------------*/
-int MIME_is_file_RFC822( char *fname )
+int MIME_is_file_RFC822( FILE *f )
 {
     char conditions[16][16] = {
-        "Received: ", "From: ", "Subject: ", "Date: ", "Content-", "content-", "from: ", "subject: ", "date: ", "boundary=", "Boundary=", "MIME-Version"        };
+        "Received: ",
+        "From: ",
+        "Subject: ",
+        "Date: ",
+        "Content-",
+        "content-",
+        "from: ",
+        "subject: ",
+        "date: ",
+        "boundary=",
+        "Boundary=",
+        "MIME-Version"        };
     int result = 0;
     int flag_mime_version = 0;
     int hitcount = 0;
     int linecount = 100; // We should only need to read the first 10 lines of any file.
     char *line;
-    FILE *f;
-
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_is_file_RFC822:DEBUG: Testing %s for RFC822 headers",FL,fname);
-
-    f = fopen(fname,"r");
-    if (!f)
-    {
-        if (glb.quiet == 0)
-        {
-            LOGGER_log("%s:%d:MIME_is_file_mime:ERROR: cannot open file '%s' for reading (%s)", FL, fname,strerror(errno));
-        }
-        return 0;
-    }
 
     line = malloc(sizeof(char) *1025);
     if (!line)
     {
-        LOGGER_log("%s:%d:MIME_is_file_mime:ERROR: cannot allocate memory for read buffer", FL);
-        return 0;
+        LOGGER_log("%s:%d:%s:ERROR: cannot allocate memory for read buffer", FL,__func__);
+        return -1;
     }
+
+    fseek(f, 0, SEEK_SET);
 
     while (((!flag_mime_version)||(hitcount < 2))&&(fgets(line,1024,f))&&(linecount--))
     {
@@ -1104,27 +912,60 @@ int MIME_is_file_RFC822( char *fname )
         for (result = 0; result < 12; result++)
         {
             /** Test for every possible MIME header prefix, ie, From: Subject: etc **/
-            if (MIME_DPEDANTIC) LOGGER_log("%s:%d:MIME_is_file_mime:DEBUG: Testing for '%s' in '%s'", FL, line, conditions[result]);
+            if (MIME_DPEDANTIC) LOGGER_log("%s:%d:%s:DEBUG: Testing for '%s' in '%s'", FL,__func__, line, conditions[result]);
             if (strncasecmp(line,conditions[result],strlen(conditions[result]))==0)
             {
                 /** If we get a match, then increment the hit counter **/
                 hitcount++;
-                if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_is_file_RFC822:DEBUG: Hit on %s",FL,conditions[result]);
+                if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Hit on %s",FL,__func__,conditions[result]);
                 if (result == 11)
                 {
                     flag_mime_version = 1;
-                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_is_file_RFC822:DEBUG: Find 'MIME Version' field",FL);
+                    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Find 'MIME Version' field",FL,__func__);
                 }
             }
         }
     }
 
-    fclose(f);
-    if (hitcount >= 2 && flag_mime_version) result = 1;
-    else result = 0;
-    if (line) free(line);
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_is_file_RFC822:DEBUG: Hit count = %d, result = %d",FL,hitcount,result);
+    if (hitcount >= 2 && flag_mime_version)
+       result = 1;
+    else
+       result = 0;
+    if (line)
+       free(line);
+    if (MIME_DNORMAL)
+     LOGGER_log("%s:%d:%s:DEBUG: Hit count = %d, result = %d",FL,__func__,hitcount,result);
     return result;
+}
+
+/*------------------------------------------------------------------------
+Procedure:     MIME_is_diskfile_RFC822
+Purpose:       Determines if the file handed to it is a MIME type email file.
+
+Input:         file name to analyze
+Output:        Returns 0 for NO, 1 for YES, -1 for "Things di
+Errors:
+------------------------------------------------------------------------*/
+int MIME_is_diskfile_RFC822( char *fname )
+{
+    int result = 0;
+    FILE *f;
+
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Testing %s for RFC822 headers",FL,__func__,fname);
+
+    f = fopen(fname,"r");
+    if (!f)
+    {
+        if (glb.quiet == 0)
+        {
+            LOGGER_log("%s:%d:%s:ERROR: cannot open file '%s' for reading (%s)", FL,__func__, fname,strerror(errno));
+        }
+        return 0;
+    }
+
+    result = MIME_is_file_RFC822(f);
+    fclose(f);
+    return result == 1;
 }
 
 /*------------------------------------------------------------------------
@@ -1162,21 +1003,16 @@ Input:
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int MIME_decode_TNEF( char *unpackdir, struct MIMEH_header_info *hinfo, int keep )
+int MIME_decode_TNEF( RIPMIME_output *unpack_metadata, struct MIMEH_header_info *hinfo )
 {
-    int result=0;
-    char fullpath[1024];
-
-    snprintf(fullpath,sizeof(fullpath),"%s/%s",unpackdir,hinfo->filename);
-    TNEF_set_path(unpackdir);
-    result = TNEF_main( fullpath );
+    int result = TNEF_main( hinfo->filename, unpack_metadata->dir );
 
     if (result >= 0)
     {
         //      result = remove( fullpath );
         if (result == -1)
         {
-            if (MIME_VERBOSE) LOGGER_log("%s:%d:MIME_decode_TNEF: Removing %s failed (%s)",FL,fullpath,strerror(errno));
+            if (MIME_VERBOSE) LOGGER_log("%s:%d:%s: Removing %s/%s failed (%s)",FL,__func__,hinfo->filename, unpack_metadata->dir,strerror(errno));
         }
     }
     return result;
@@ -1190,12 +1026,11 @@ int MIME_report_filename_decoded_RIPOLE(char *filename)
 }
 
 /*-----------------------------------------------------------------\
-  Function Name : MIME_decode_OLE
+  Function Name : MIME_decode_OLE_diskfile
   Returns Type  : int
   ----Parameter List
-  1. char *unpackdir,
+  1. RIPMIME_output *unpack_metadata,
   2.  struct MIMEH_header_info *hinfo,
-  3.  int keep ,
   ------------------
   Exit Codes    :
   Side Effects  :
@@ -1206,13 +1041,15 @@ Comments:
 Changes:
 
 \------------------------------------------------------------------*/
-int MIME_decode_OLE( char *unpackdir, struct MIMEH_header_info *hinfo, int keep )
+int MIME_decode_OLE_diskfile( RIPMIME_output *unpack_metadata, struct MIMEH_header_info *hinfo )
 {
     struct OLE_object ole;
-    char fullpath[1024];
     int result;
+    char *fn;
+    int fn_l = strlen(unpack_metadata->dir) + strlen(hinfo->filename) + sizeof(char) * 2;
 
-    snprintf(fullpath,sizeof(fullpath),"%s/%s",unpackdir,hinfo->filename);
+    fn = malloc(fn_l);
+    snprintf(fn,fn_l,"%s/%s",unpack_metadata->dir,hinfo->filename);
 
     OLE_init(&ole);
     OLE_set_quiet(&ole,glb.quiet);
@@ -1221,33 +1058,58 @@ int MIME_decode_OLE( char *unpackdir, struct MIMEH_header_info *hinfo, int keep 
     OLE_set_save_unknown_streams(&ole,0);
     OLE_set_filename_report_fn(&ole, MIME_report_filename_decoded_RIPOLE );
 
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_OLE:DEBUG: Starting OLE Decode",FL);
-    result = OLE_decode_file(&ole, fullpath, unpackdir );
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_OLE:DEBUG: Decode done, cleaning up.",FL);
-    OLE_decode_file_done(&ole);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Starting OLE Decode",FL,__func__);
+    result = OLE_decode_diskfile(&ole, fn, unpack_metadata );
+    free(fn);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decode done, cleaning up.",FL,__func__);
+    OLE_decode_done(&ole);
+    if (ole.f)
+        fclose(ole.f);
 
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_OLE:DEBUG: Decode returned with code = %d",FL,result);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decode returned with code = %d",FL,__func__,result);
+    return result;
+}
+
+int MIME_decode_OLE_file( RIPMIME_output *unpack_metadata, FILE *f )
+{
+    struct OLE_object ole;
+    int result;
+
+    OLE_init(&ole);
+    OLE_set_quiet(&ole,glb.quiet);
+    OLE_set_verbose(&ole,glb.verbosity);
+    OLE_set_debug(&ole,glb.debug);
+    OLE_set_save_unknown_streams(&ole,0);
+    OLE_set_filename_report_fn(&ole, MIME_report_filename_decoded_RIPOLE );
+
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Starting OLE Decode",FL,__func__);
+    result = OLE_decode_file(&ole, f, unpack_metadata );
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decode done, cleaning up.",FL,__func__);
+    OLE_decode_done(&ole);
+    if (ole.f)
+        fseek(ole.f, 0, SEEK_SET);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decode returned with code = %d",FL,__func__,result);
     return result;
 }
 #endif
 
+
 /*------------------------------------------------------------------------
-Procedure:     MIME_decode_raw ID:1
+Procedure:     MIME_decode_std_raw ID:1
 Purpose:       Decodes a binary type attachment, ie, no encoding, just raw data.
 Input:
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int MIME_decode_raw( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hinfo, int keep )
+MIME_element* MIME_decode_std_raw(MIME_element* parent, FFGET_FILE *f, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *hinfo)
 {
     int result = 0;
-    char fullpath[1024];
     int bufsize=1024;
-    char *buffer = malloc((bufsize +1)*sizeof(char));
+    char *buffer = malloc((bufsize + 1)*sizeof(char));
     size_t readcount;
     int file_has_uuencode = 0;
     int decode_entire_file = 0;
-    int fo;
+    MIME_element* cur_mime = NULL;
 
     /* Decoding / reading a binary attachment is a real interesting situation, as we
      * still use the fgets() call, but we do so repeatedly until it returns a line with a
@@ -1256,74 +1118,64 @@ int MIME_decode_raw( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *h
      * --binary flag
      */
 
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_raw:DEBUG: Start\n",FL);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Start\n",FL,__func__);
 
-    snprintf(fullpath,sizeof(fullpath),"%s/%s",unpackdir,hinfo->filename);
-    fo = open(fullpath, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR);
-
-    if (fo == -1)
-    {
-        LOGGER_log("%s:%d:MIME_decode_raw:ERROR: cannot open file %s for writing. (%s)\n\n",FL,fullpath,strerror(errno));
-        return -1;
-    }
+    cur_mime = MIME_element_add (NULL, unpack_metadata, hinfo->filename, hinfo->content_type_string, hinfo->content_transfer_encoding_string, hinfo->name, hinfo->current_recursion_level, glb.attachment_count, glb.filecount, __func__);
 
     while ((readcount=FFGET_raw(f, (unsigned char *) buffer,bufsize)) > 0)
     {
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_raw:DEBUG: BUFFER[%p]= '%s'\n",FL,buffer, buffer);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: BUFFER[%p]= '%s'\n",FL,__func__,buffer, buffer);
 
         if ((!file_has_uuencode)&&(UUENCODE_is_uuencode_header( buffer )))
         {
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_raw:DEBUG: UUENCODED is YES (buffer=[%p]\n",FL,buffer);
-
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_raw:DEBUG: File contains UUENCODED data(%s)\n",FL,buffer);
-
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: File contains UUENCODED data(%s)\n",FL,__func__,buffer);
             file_has_uuencode = 1;
         }
 
         if (BS_cmp(buffer, readcount))
         {
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_raw:DEBUG: Boundary located - breaking out.\n",FL);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Boundary located - breaking out.\n",FL,__func__);
             break;
         } else {
-            size_t bc;
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_raw:DEBUG: writing: %s\n",FL, buffer);
-            bc = write( fo, buffer, readcount);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: writing: %s\n",FL,__func__, buffer);
+            fwrite( buffer, readcount, 1, cur_mime->f);
         }
     }
 
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_raw:DEBUG: Completed reading RAW data\n",FL);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Completed reading RAW data\n",FL,__func__);
     free(buffer);
-    close(fo);
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_raw:DEBUG: Closed file and free'd buffer\n",FL);
+
     // If there was UUEncoded portions [potentially] in the email, the
     // try to extract them using the MIME_decode_uu()
     if (file_has_uuencode)
     {
-        char full_decode_path[512];
-        snprintf(full_decode_path,sizeof(full_decode_path),"%s/%s",unpackdir,hinfo->filename);
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_raw:DEBUG: Decoding UUencoded data\n",FL);
+        FFGET_FILE * ffg = NULL;
+
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding UUencoded data\n",FL,__func__);
         if ( hinfo->content_transfer_encoding == _CTRANS_ENCODING_UUENCODE ) decode_entire_file = 0;
 
-        //result = UUENCODE_decode_uu(NULL, unpackdir, hinfo->filename, hinfo->uudec_name, sizeof(hinfo->uudec_name), decode_entire_file, keep );
-        result = UUENCODE_decode_uu(NULL, unpackdir, full_decode_path, hinfo->uudec_name, sizeof(hinfo->uudec_name), decode_entire_file, keep );
+        ffg = UUENCODE_make_sourcestream(cur_mime->f); /* fseek to begin is here */
+        result = UUENCODE_decode_uu(ffg , hinfo->uudec_name, decode_entire_file, unpack_metadata, hinfo );
         if (result == -1)
         {
             switch (uuencode_error) {
                 case UUENCODE_STATUS_SHORT_FILE:
                 case UUENCODE_STATUS_CANNOT_OPEN_FILE:
                 case UUENCODE_STATUS_CANNOT_FIND_FILENAME:
-                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_raw:DEBUG: Nullifying uuencode_error result %d",FL, uuencode_error);
+                    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Nullifying uuencode_error result %d",FL,__func__, uuencode_error);
                     result = 0;
                     break;
 
                 case UUENCODE_STATUS_CANNOT_ALLOCATE_MEMORY:
-                    LOGGER_log("%s:%d:MIME_decode_raw:ERROR: Failure to allocate memory for UUdecode process",FL);
-                    return -1;
+                    LOGGER_log("%s:%d:%s:ERROR: Failure to allocate memory for UUdecode process",FL,__func__);
+                    cur_mime->decode_result_code = -1;
+                    return cur_mime;
                     break;
 
                 default:
-                    LOGGER_log("%s:%d:MIME_decode_raw:ERROR: Unknown return code from UUDecode process [%d]",FL,uuencode_error);
-                    return -1;
+                    LOGGER_log("%s:%d:%s:ERROR: Unknown return code from UUDecode process [%d]",FL,__func__,uuencode_error);
+                    cur_mime->decode_result_code = -1;
+                    return cur_mime;
             }
         }
         if (result == UUENCODE_STATUS_SHORT_FILE) result = 0;
@@ -1332,72 +1184,65 @@ int MIME_decode_raw( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *h
         {
             if (strcasecmp(hinfo->uudec_name,"winmail.dat")==0)
             {
-                if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_raw:DEBUG: Decoding TNEF format\n",FL);
+                if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding TNEF format\n",FL,__func__);
                 snprintf(hinfo->filename, 128, "%s", hinfo->uudec_name);
-                MIME_decode_TNEF( unpackdir, hinfo, keep);
+                MIME_decode_TNEF( unpack_metadata, hinfo);
             }
-            else LOGGER_log("%s:%d:MIME_decode_raw:WARNING: hinfo has been clobbered.\n",FL);
+            else LOGGER_log("%s:%d:%s:WARNING: hinfo has been clobbered.\n",FL,__func__);
         }
     }
+    MIME_element_deactivate(cur_mime, unpack_metadata);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Closed file and free'd buffer\n",FL,__func__);
 
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_raw:DEBUG: End[result = %d]\n",FL,result);
-    return result;
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: End[result = %d]\n",FL,__func__,result);
+    cur_mime->decode_result_code = result;
+    return cur_mime;
 }
 
 /*------------------------------------------------------------------------
-Procedure:     MIME_decode_text ID:1
+Procedure:     MIME_decode_std_text ID:1
 Purpose:       Decodes an input stream into a text file.
 Input:         unpackdir : directory where to place new text file
 hinfo : struct containing information from the last parsed headers
-keep : if set, retain the file
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int MIME_decode_text( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hinfo, int keep )
+MIME_element* MIME_decode_std_text( MIME_element* parent, FFGET_FILE *f, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *hinfo )
 {
-
-    FILE *of;                           // output file
     int linecount = 0;                  // The number of lines
     int file_has_uuencode = 0;          // Flag to indicate this text has UUENCODE in it
-    char fullfilename[1024]="";     // Filename of the output file
     char line[1024];                    // The input lines from the file we're decoding
     char *get_result = &line[0];
     int lastlinewasboundary = 0;
     int result = 0;
     int decodesize=0;
+    MIME_element* cur_mime = NULL;
 
-    snprintf(fullfilename,sizeof(fullfilename),"%s/%s",unpackdir,hinfo->filename);
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_text:DEBUG: Decoding TEXT [encoding=%d] to %s\n",FL, hinfo->content_transfer_encoding, fullfilename);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding TEXT [encoding=%d] to %s\n",FL,__func__, hinfo->content_transfer_encoding, hinfo->filename);
 
+    cur_mime = MIME_element_add (NULL, unpack_metadata, hinfo->filename, hinfo->content_type_string, hinfo->content_transfer_encoding_string, hinfo->name, hinfo->current_recursion_level, glb.attachment_count, glb.filecount, __func__);
     if (!f)
     {
         /** If we cannot open the file for reading, leave an error and return -1 **/
-        LOGGER_log("%s:%d:MIME_decode_text:ERROR: print-quotable input stream broken.",FL);
-        return _EXITERR_MIMEREAD_CANNOT_OPEN_INPUT;
+        LOGGER_log("%s:%d:%s:ERROR: print-quotable input stream broken.",FL,__func__);
+        cur_mime->decode_result_code = _EXITERR_MIMEREAD_CANNOT_OPEN_INPUT;
+        return cur_mime;
     }
     if (f)
     {
-        /** If we were able to open the input file, try opening the output file and process the data **/
-        of = fopen(fullfilename,"w");
-        if (!of)
-        {
-            /** If we were unable to open the output file, report the error and return -1 **/
-            LOGGER_log("%s:%d:MIME_decode_text:ERROR: cannot open %s for writing",FL,fullfilename);
-            return _EXITERR_MIMEREAD_CANNOT_WRITE_OUTPUT;
-        }
-        while ((get_result = FFGET_fgets(line,1023,f))&&(of))
+        while ((get_result = FFGET_fgets(line,1023,f))&&(cur_mime->f))
         {
             int line_len = strlen(line);
             linecount++;
-            //      if (MIME_DPEDANTIC) LOGGER_log("%s:%d:MIME_decode_text:DEBUG: line=%s",FL,line);
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_text:DEBUG: line[len=%d]=%s",FL,line_len,line);
+            //      if (MIME_DPEDANTIC) LOGGER_log("%s:%d:%s:DEBUG: line=%s",FL,__func__,line);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: line[len=%d]=%s",FL,__func__,line_len,line);
             //20041217-1529:PLD:
             if (line[0] == '-')
             {
-                if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_DNORMAL:DEBUG: Testing boundary",FL);
+                if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_DNORMAL:DEBUG: Testing boundary",FL,__func__);
                 if ((BS_count() > 0)&&(BS_cmp(line,line_len)))
                 {
-                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_DNORMAL:DEBUG: Hit a boundary on the line",FL);
+                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_DNORMAL:DEBUG: Hit a boundary on the line",FL,__func__);
                     lastlinewasboundary = 1;
                     result = 0;
                     break;
@@ -1408,37 +1253,33 @@ int MIME_decode_text( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *
             {
                 if (hinfo->content_transfer_encoding == _CTRANS_ENCODING_QP)
                 {
-                    size_t bc;
-                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_DNORMAL:DEBUG: Hit a boundary on the line",FL);
+                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_DNORMAL:DEBUG: Hit a boundary on the line",FL,__func__);
                     decodesize = MDECODE_decode_qp_text(line);
-                    bc = fwrite(line, 1, decodesize, of);
+                    fwrite(line, 1, decodesize, cur_mime->f);
 
                 } else {
-                    fprintf(of,"%s",line);
+                    fprintf(cur_mime->f,"%s",line);
                 }
 
                 if ((!file_has_uuencode)&&( UUENCODE_is_uuencode_header( line )))
                 {
-                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_text:DEBUG: UUENCODED data located in file.\n",FL);
+                    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: UUENCODED data located in file.\n",FL,__func__);
                     file_has_uuencode = 1;
                 }
             }
             //  linecount++;
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_DNORMAL:DEBUG: End processing line.",FL);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_DNORMAL:DEBUG: End processing line.",FL,__func__);
         } // while
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_text:DEBUG: Done writing output file '%s'...now attempting to close.",FL, fullfilename);
-        // if the file is still safely open
-        if (of)
-        {
-            fclose(of);
-        } // if file still safely open
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Done writing output file '%s'...now attempting to close.",FL,__func__, cur_mime->fullpath);
+
+        MIME_element_deactivate(cur_mime, unpack_metadata);
 
         if (linecount == 0)
         {
-            result = MIME_STATUS_ZERO_FILE;
-            return result;
+            cur_mime->decode_result_code = MIME_STATUS_ZERO_FILE;
+            return cur_mime;
         }
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_text:DEBUG: Closed.",FL);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Closed.",FL,__func__);
     } // if main input file stream was open
 
     // If our input from the file was invalid due to EOF or other
@@ -1446,7 +1287,7 @@ int MIME_decode_text( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *
     // occured.
     //
     if (!get_result) {
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_text:DEBUG: FFGET module ran out of file data while attempting to decode",FL);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: FFGET module ran out of file data while attempting to decode",FL,__func__);
         //      result = -1;
         result = MIME_ERROR_FFGET_EMPTY; // 20040305-1323:PLD
     }
@@ -1456,14 +1297,20 @@ int MIME_decode_text( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *
     //
     if (file_has_uuencode)
     {
-        char ffname[256];
-        snprintf(ffname,256,"%s/%s", unpackdir, hinfo->filename);
+        FILE *fuue = NULL;
+        FFGET_FILE * ffg = NULL;
+        char *fn;
+        int fn_l = strlen(unpack_metadata->dir) + strlen(hinfo->filename) + sizeof(char) * 2;
+
+        fn = malloc(fn_l);
+        snprintf(fn,fn_l,"%s/%s",unpack_metadata->dir,hinfo->filename);
+
         // PLD-20040627-1212
         // Make sure uudec_name is blank too
         //
         hinfo->uudec_name[0] = '\0';
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_text:DEBUG: Decoding UUencoded data in file '%s'\n",FL,hinfo->filename);
-        //result = UUENCODE_decode_uu( NULL, unpackdir, hinfo->filename, hinfo->uudec_name, sizeof(hinfo->uudec_name), 1, keep );
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding UUencoded data in file '%s'\n",FL,__func__,hinfo->filename);
+        //result = UUENCODE_decode_uu( NULL, info->filename, hinfo->uudec_name, 1 );
         // Attempt to decode the UUENCODED data in the file,
         //      NOTE - hinfo->uudec_name is a blank buffer which will be filled by the UUENCODE_decode_uu
         //          function once it has located a filename in the UUENCODED data.  A bit of a problem here
@@ -1472,43 +1319,50 @@ int MIME_decode_text( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *
         //      NOTE - this function returns the NUMBER of attachments it decoded in the return value!  Don't
         //          propergate this value unintentionally to parent functions (ie, if you were thinking it was
         //          an error-status return value
+        fuue = UUENCODE_make_file_obj (fn);
+        free(fn);
+        ffg = UUENCODE_make_sourcestream(fuue);
 
-        result = UUENCODE_decode_uu( NULL, unpackdir, ffname, hinfo->uudec_name, sizeof(hinfo->uudec_name), 1, keep );
+        result = UUENCODE_decode_uu( ffg, hinfo->uudec_name, 1, unpack_metadata, hinfo );
+        fclose(fuue);
         if (result == -1)
         {
             switch (uuencode_error) {
                 case UUENCODE_STATUS_SHORT_FILE:
                 case UUENCODE_STATUS_CANNOT_OPEN_FILE:
                 case UUENCODE_STATUS_CANNOT_FIND_FILENAME:
-                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_raw:DEBUG: Nullifying uuencode_error result %d",FL, uuencode_error);
+                    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Nullifying uuencode_error result %d",FL,__func__, uuencode_error);
                     result = 0;
                     break;
                 case UUENCODE_STATUS_CANNOT_ALLOCATE_MEMORY:
-                    LOGGER_log("%s:%d:MIME_decode_raw:ERROR: Failure to allocate memory for UUdecode process",FL);
-                    return -1;
+                    LOGGER_log("%s:%d:%s:ERROR: Failure to allocate memory for UUdecode process",FL,__func__);
+                    cur_mime->decode_result_code = -1;
+                    return cur_mime;
                     break;
                 default:
-                    LOGGER_log("%s:%d:MIME_decode_raw:ERROR: Unknown return code from UUDecode process [%d]",FL,uuencode_error);
-                    return -1;
+                    LOGGER_log("%s:%d:%s:ERROR: Unknown return code from UUDecode process [%d]",FL,__func__,uuencode_error);
+                    cur_mime->decode_result_code = -1;
+                    return cur_mime;
             }
         }
         if ( result > 0 ) { glb.attachment_count += result; result = 0; }
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_text:DEBUG: hinfo = %p\n",FL,hinfo);
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_text:DEBUG: Done. [ UUName = '%s' ]\n",FL,hinfo->uudec_name);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: hinfo = %p\n",FL,__func__,hinfo);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Done. [ UUName = '%s' ]\n",FL,__func__,hinfo->uudec_name);
         if (strncasecmp(hinfo->uudec_name,"winmail.dat",11)==0)
         {
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_text:DEBUG: Decoding TNEF format\n",FL);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding TNEF format\n",FL,__func__);
             snprintf(hinfo->filename, 128, "%s", hinfo->uudec_name);
-            MIME_decode_TNEF( unpackdir, hinfo, keep );
+            MIME_decode_TNEF( unpack_metadata, hinfo );
         }
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_text:DEBUG: Completed decoding UUencoded data.\n",FL);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Completed decoding UUencoded data.\n",FL,__func__);
     }
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_text:DEBUG: result=%d ----------------Done\n",FL,result);
-    return result;
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: result=%d ----------------Done\n",FL,__func__,result);
+    cur_mime->decode_result_code = result;
+    return cur_mime;
 }
 
 /*------------------------------------------------------------------------
-Procedure:     MIME_decode_64 ID:1
+Procedure:     MIME_decode_std_64 ID:1
 Purpose:       This routine is very very very important, it's the key to ensuring
 we get our attachments out of the email file without trauma!
 NOTE - this has been -slightly altered- in order to make provision
@@ -1518,12 +1372,12 @@ now have to detect the start character of the "boundary" marker
 I may consider testing the 1st n' chars of the boundary marker
 just incase it's not always a hypen '-'.
 Input:         FGET_FILE *f: stream we're reading from
-char *unpackdir: directory we have to write the file to
+RIPMIME_output *unpack_metadata: directory we have to write the file to
 struct MIMEH_header_info *hinfo: Auxillairy information such as the destination filename
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hinfo )
+MIME_element* MIME_decode_std_64( MIME_element* parent, FFGET_FILE *f, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *hinfo )
 {
     int i;
     int cr_total = 0;
@@ -1538,7 +1392,6 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
     long int bytecount=0; /* The total file decoded size */
     char output[3]; /* The 4->3 byte output array */
     char input[4]; /* The 4->3 byte input array */
-    char fullMIME_filename[_MIME_STRLEN_MAX]=""; /* Full Filename of output file */
 
     // Write Buffer routine
 
@@ -1546,21 +1399,15 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
     unsigned char *wbpos;
     int wbcount = 0;
     int loop;
+    MIME_element* cur_mime = NULL;
 
-    int of; /* output file pointer */
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_64:DEBUG: attempting to decode '%s'", FL, hinfo->filename);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: attempting to decode '%s'", FL,__func__, hinfo->filename);
 
-    /* generate the MIME_filename, and open it up... */
-    if (glb.unique_names) MIME_test_uniquename( unpackdir, hinfo->filename, glb.rename_method );
-    snprintf(fullMIME_filename,_MIME_STRLEN_MAX,"%s/%s",unpackdir,hinfo->filename);
-    //of = fopen(fullMIME_filename,"wb");
-    of = open(fullMIME_filename, O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR);
-    /* if we were unable to open the output file, then we better log an error and drop out */
-    if (of < 0)
+    cur_mime = MIME_element_add (NULL, unpack_metadata, hinfo->filename, hinfo->content_type_string, hinfo->content_transfer_encoding_string, hinfo->name, hinfo->current_recursion_level, glb.attachment_count, glb.filecount, __func__);
+    if (cur_mime->f == NULL)
     {
-        LOGGER_log("%s:%d:MIME_decode_64:ERROR: Cannot open output file %s for BASE64 decoding. (%s)",FL,fullMIME_filename, strerror(errno));
-        //      exit(_EXITERR_BASE64_OUTPUT_NOT_OPEN);
-        return -1;
+        cur_mime->decode_result_code = -1;
+        return cur_mime;
     }
 
     // Allocate the write buffer.  By using the write buffer we gain an additional 10% in performance
@@ -1568,8 +1415,9 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
     writebuffer = malloc( _MIME_WRITE_BUFFER_SIZE *sizeof(unsigned char));
     if (!writebuffer)
     {
-        LOGGER_log("%s:%d:MIME_decode_64:ERROR: cannot allocate %dbytes of memory for the write buffer",FL, _MIME_WRITE_BUFFER_SIZE);
-        return -1;
+        LOGGER_log("%s:%d:%s:ERROR: cannot allocate %dbytes of memory for the write buffer",FL,__func__, _MIME_WRITE_BUFFER_SIZE);
+        cur_mime->decode_result_code = -1;
+        return cur_mime;
     }
     else {
         wbpos = writebuffer;
@@ -1578,7 +1426,7 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
     /* Set our ignore_crcount flag */
     if (BS_count() > 0)
     {
-        //LOGGER_log("%s:%d:MIME_decode_64:DEBUG: Ignore CR set to 1",FL);
+        //LOGGER_log("%s:%d:%s:DEBUG: Ignore CR set to 1",FL,__func__);
         ignore_crcount = 1;
     }
     /* collect prefixing trash (if any, such as spaces, CR's etc)*/
@@ -1590,7 +1438,6 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
     /* do an endless loop, as we're -breaking- out later */
     while (1)
     {
-        int lastchar_was_linebreak=0;
         /* Initialise the decode buffer */
         input[0] = input[1] = input[2] = input[3] = 0; // was '0' - Stepan Kasal patch
         /* snatch 4 characters from the input */
@@ -1607,7 +1454,7 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
             //----------INLINE Version of FFGET_getchar()
             //
             do {
-                if ((c == '\n')||(c == '\r')) lastchar_was_linebreak = 1; else lastchar_was_linebreak = 0;
+                // lastchar_was_linebreak = ((c == '\n')||(c == '\r'));
                 if (f->ungetcset)
                 {
                     f->ungetcset = 0;
@@ -1634,11 +1481,11 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
             //
             //-------END OF INLINE---------------------------------------------
             if ((ignore_crcount == 1)&&(c == '-'))
-                //&&(lastchar_was_linebreak == 1))
+                //&&(lastchar_was_linebreak))
             {
                 int hit = 0;
                 char *p;
-                if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_64:DEBUG: leader '-' found at %50s",FL,(f->startpoint -1));
+                if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: leader '-' found at %50s",FL,__func__,(f->startpoint -1));
                 p = strchr((f->startpoint -1), '\n');
                 if (p == NULL) {
                     /* The boundary test was failing because sometimes the full line
@@ -1647,16 +1494,16 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
                      */
                     char scratch[1024];
                     FFGET_fgets(scratch,sizeof(scratch), f);
-                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_64:DEBUG: Scratch = '%s'", FL, scratch);
-                    hit = BS_cmp(scratch,strlen(scratch) +1);
-                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_64:DEBUG: Boundary hit = %d", FL, hit);
+                    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Scratch = '%s'", FL,__func__, scratch);
+                    hit = BS_cmp(scratch,strlen(scratch) + 1);
+                    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Boundary hit = %d", FL,__func__, hit);
                 } else {
                     *p = '\0';
-                    hit = BS_cmp((f->startpoint -1),strlen(f->startpoint) +1);
+                    hit = BS_cmp((f->startpoint -1),strlen(f->startpoint) + 1);
                     *p = '\n';
                 }
                 if (hit > 0) {
-                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_64:DEBUG: Boundary detected and breaking out ",FL);
+                    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Boundary detected and breaking out ",FL,__func__);
                     //      FFGET_fgets(scratch,sizeof(scratch),f);
                     //      eom_reached = 1;
                     boundary_crash = 1;
@@ -1691,7 +1538,7 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
                 // CR's ).
                 if (cr_count > 2)
                 {
-                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_64:DEBUG: EOF Reached due to two consecutive CR's on line %d\n",FL,cr_total);
+                    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: EOF Reached due to two consecutive CR's on line %d\n",FL,__func__,cr_total);
                     eom_reached++;
                     break;
                 }
@@ -1707,18 +1554,19 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
             /* if we get an EOF char, then we know something went wrong */
             if ( c == EOF )
             {
-                size_t bc;
-                if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_64:DEBUG: input stream broken for base64 decoding for file %s. %ld bytes of data in buffer to be written out\n",FL,hinfo->filename,wbcount);
+                if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: input stream broken for base64 decoding for file %s. %ld bytes of data in buffer to be written out\n",FL,__func__,hinfo->filename,wbcount);
                 status = MIME_ERROR_B64_INPUT_STREAM_EOF;
-                //fwrite(writebuffer, 1, wbcount, of);
-                bc = write( of, writebuffer, wbcount);
-                close(of);
-                if (writebuffer) free(writebuffer);
-                return status;
+                fwrite(writebuffer, 1, wbcount, cur_mime->f);
+                MIME_element_deactivate(cur_mime, unpack_metadata);
+                if (writebuffer)
+                   free(writebuffer);
+                cur_mime->decode_result_code = status;
+                return cur_mime;
                 break;
             } /* if c was the EOF */
             else if (c == '=')
             {
+                char line_buf[1025];
                 // Once we've found a stop char, we can actually just "pad" in the rest
                 // of the stop chars because we know we're at the end. Some MTA's dont
                 // put in enough stopchars... at least it seems X-MIMEOLE: Produced By Microsoft MimeOLE V5.50.4133.2400
@@ -1737,8 +1585,8 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
                 // are now only retrieving data byte at a time.
                 // So, now we -absorb- till the end of the line using FFGET_fgets()
                 stopcount = 4 -i;
-                FFGET_fgets(scratch,sizeof(scratch),f);
-                if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_64:DEBUG: Stop char detected pos=%d...StopCount = %d\n",FL,i,stopcount);
+                FFGET_fgets(line_buf,1024,f);
+                if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Stop char detected pos=%d...StopCount = %d\n",FL,__func__,i,stopcount);
                 i = 4;
                 break; // out of FOR.
             }
@@ -1778,9 +1626,7 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
             //  interrupt costs.
             if ( wbcount > _MIME_WRITE_BUFFER_LIMIT )
             {
-                size_t bc;
-                bc = write ( of, writebuffer, wbcount );
-                //          fwrite(writebuffer, 1, wbcount, of);
+                fwrite(writebuffer, 1, wbcount, cur_mime->f);
                 wbpos = writebuffer;
                 wbcount = 0;
             }
@@ -1794,7 +1640,7 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
             // tally up our total byte conversion count
             bytecount+=(3 -stopcount);
         }
-        else if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_64:DEBUG: could not attain 4 bytes input\n",FL);
+        else if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: could not attain 4 bytes input\n",FL,__func__);
 
         // if we wrote less than 3 chars, it means we were at the end of the encoded file thus we exit
         if ((eom_reached)||(stopcount > 0)||(boundary_crash)||(i!=4))
@@ -1803,40 +1649,40 @@ int MIME_decode_64( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hi
             //  we'll end up with truncated files.
             if (wbcount > 0)
             {
-                size_t bc;
-                //fwrite(writebuffer, 1, wbcount, of);
-                bc = write( of, writebuffer, wbcount);
+                fwrite(writebuffer, 1, wbcount, cur_mime->f);
             }
             /* close the output file, we're done writing to it */
-            close(of);
+            MIME_element_deactivate(cur_mime, unpack_metadata);
             /* if we didn't really write anything, then trash the  file */
             if (bytecount == 0)
             {
-                //              unlink(fullMIME_filename);
+                //              unlink(fullpath);
                 status = MIME_BASE64_STATUS_ZERO_FILE;
             }
             if (boundary_crash)
             {
                 // Absorb to end of line
-                //
                 status = MIME_BASE64_STATUS_HIT_BOUNDARY; // was _BOUNDARY_CRASH
             }
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_64:DEBUG: File size = %ld bytes, Exit Status = %d, Boundary Crash = %d\n",FL, bytecount, status, boundary_crash);
-            if (writebuffer) free(writebuffer);
-            return status;
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: File size = %ld bytes, Exit Status = %d, Boundary Crash = %d\n",FL,__func__, bytecount, status, boundary_crash);
+            if (writebuffer)
+               free(writebuffer);
+            cur_mime->decode_result_code = status;
+            return cur_mime;
         } // if End-of-MIME or Stopchars appeared
     } // while
-    if (writebuffer) free(writebuffer);
-    return status;
+    if (writebuffer)
+       free(writebuffer);
+    cur_mime->decode_result_code = status;
+    return cur_mime;
 }
 
-
 /*-----------------------------------------------------------------\
-  Function Name : MIME_decode_64_cleanup
+  Function Name : MIME_decode_std_64_cleanup
   Returns Type  : int
   ----Parameter List
   1. FFGET_FILE *f,
-  2.  char *unpackdir,
+  2.  RIPMIME_output *unpack_metadata,
   3.  struct MIMEH_header_info *hinfo,
   ------------------
   Exit Codes    :
@@ -1848,7 +1694,7 @@ Comments:
 Changes:
 
 \------------------------------------------------------------------*/
-int MIME_decode_64_cleanup( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hinfo)
+int MIME_decode_std_64_cleanup( FFGET_FILE *f)
 {
     int result = 0;
     char buffer[128];
@@ -1867,13 +1713,13 @@ Purpose:       Decodes a text sequence as detected in the processing of the MIME
 This is a specialised call, not really a normal part of MIME decoding, but is
 required in order to deal with decyphering MS Outlook visable defects.
 Input:         char *filename: Name of the encoded file we need to decode
-char *unpackdir: Directory we need to unpack the file to
+RIPMIME_output *unpack_metadata: Directory we need to unpack the file to
 struct MIMEH_header_info *hinfo: Header information already gleaned from the headers
 int current_recursion_level: How many nest levels we are deep
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int MIME_doubleCR_decode( char *filename, char *unpackdir, struct MIMEH_header_info *hinfo, int current_recursion_level )
+int MIME_doubleCR_decode( char *filename, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *hinfo, int current_recursion_level )
 {
     int result = 0;
     struct MIMEH_header_info h;
@@ -1885,21 +1731,27 @@ int MIME_doubleCR_decode( char *filename, char *unpackdir, struct MIMEH_header_i
     p = filename;
     // * Initialise the header fields
     h.uudec_name[0] = '\0';
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_doubleCR_decode:DEBUG: filename=%s, path=%s, recursion=%d", FL, filename, unpackdir, current_recursion_level );
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: filename=%s, path=%s, recursion=%d", FL,__func__, filename, unpack_metadata->dir, current_recursion_level );
     memcpy(&h, hinfo, sizeof(h));
     // Works for ripMIME    snprintf(h.filename, sizeof(h.filename), "%s/%s", unpackdir, p);
     snprintf(h.filename, sizeof(h.filename), "%s", p); /// Works for Xamime
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_doubleCR_decode:DEBUG: header.filename = %s", FL, h.filename );
-    if (MIME_is_file_RFC822(filename))
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: header.filename = %s", FL,__func__, h.filename );
+    if (MIME_is_diskfile_RFC822(filename))
     {
         if (MIME_VERBOSE) LOGGER_log("Attempting to decode Double-CR delimeted MIME attachment '%s'\n",filename);
-        result = MIME_unpack( unpackdir, filename, current_recursion_level ); // 20040305-1303:PLD - Capture the result of the unpack and propagate up
+        result = MIME_unpack( unpack_metadata, filename, current_recursion_level ); // 20040305-1303:PLD - Capture the result of the unpack and propagate up
     }
-    else if (UUENCODE_is_file_uuencoded(h.filename))
+    else if (UUENCODE_is_diskfile_uuencoded(h.filename))
     {
+        FILE *fuue = NULL;
+        FFGET_FILE * ffg = NULL;
+
         if (MIME_VERBOSE) LOGGER_log("Attempting to decode UUENCODED attachment from Double-CR delimeted attachment '%s'\n",filename);
+        fuue = UUENCODE_make_file_obj (filename);
+        ffg = UUENCODE_make_sourcestream(fuue);
         UUENCODE_set_doubleCR_mode(1);
-        result = UUENCODE_decode_uu(NULL, unpackdir, filename, h.uudec_name, _MIMEH_FILENAMELEN_MAX , 1, 1 );
+        result = UUENCODE_decode_uu(ffg, h.uudec_name, 1, unpack_metadata, hinfo );
+        fclose(fuue);
         UUENCODE_set_doubleCR_mode(0);
         glb.attachment_count += result;
         result = 0;
@@ -1926,61 +1778,61 @@ size_t MIME_read_raw( char *src_mpname, char *dest_mpname, size_t rw_buffer_size
     size_t readcount, writecount;
     size_t fsize=-1;
     char *rw_buffer;
-    int fin;
-    int fout;
+    FILE* input_f = NULL;
+    FILE* result_f = NULL;
 
     rw_buffer = NULL;
 
     if (*src_mpname == '\0') {
-        fin = STDIN_FILENO;
+        input_f = STDIN_FILENO;
     } else {
-        fin = open(src_mpname, O_RDONLY);
-        if (fin == -1) {
-            LOGGER_log("%s:%d:MIME_read_raw:ERROR: Cannot open '%s' for reading (%s)", FL, src_mpname, strerror(errno));
+        input_f = fopen(src_mpname, "r");
+        if (input_f == NULL) {
+            LOGGER_log("%s:%d:%s:ERROR: Cannot open '%s' for reading (%s)", FL,__func__, src_mpname, strerror(errno));
             return -1;
         }
     }
 
-    rw_buffer = malloc( (rw_buffer_size +1) *sizeof(char) );
+    rw_buffer = malloc( (rw_buffer_size + 1) *sizeof(char) );
     if ( !rw_buffer )
     {
-        LOGGER_log("%s:%d:MIME_read:ERROR: could not allocate %d of memory for file read buffer\n",FL, rw_buffer_size );
+        LOGGER_log("%s:%d:%s:ERROR: could not allocate %d of memory for file read buffer\n",FL,__func__, rw_buffer_size );
         return -1;
     }
 
     /* open up our input file */
-    fout = open(dest_mpname,O_WRONLY|O_CREAT, S_IRUSR|S_IWUSR);
-    if (fout == -1) {
-        LOGGER_log("%s:%d:MIME_read_raw:ERROR: Cannot open '%s' for writing. (%s)",FL, dest_mpname, strerror(errno));
+    result_f = fopen(dest_mpname, "w");
+    if (result_f == NULL) {
+        LOGGER_log("%s:%d:%s:ERROR: Cannot open '%s' for writing. (%s)",FL,__func__, dest_mpname, strerror(errno));
         return -1;
     }
 
     fsize=0;
     /* while there is more data, consume it */
     do {
-        readcount = read( fin, rw_buffer, rw_buffer_size );
+        readcount = fread( rw_buffer, rw_buffer_size, 1, input_f );
         if (readcount > 0) {
-            writecount = write( fout, rw_buffer, readcount );
+            writecount = fwrite(rw_buffer, readcount, 1, result_f );
             if (writecount == -1) {
-                LOGGER_log("%s:%d:MIME_read_raw:ERROR: While attempting to write data to '%s' (%s)", FL, dest_mpname, strerror(errno));
+                LOGGER_log("%s:%d:%s:ERROR: While attempting to write data to '%s' (%s)", FL,__func__, dest_mpname, strerror(errno));
                 return -1;
             }
             if ( readcount != writecount )
             {
-                LOGGER_log("%s:%d:MIME_read_raw:ERROR: Attempted to write %d bytes, but only managed %d to file '%s'",FL, readcount, writecount, dest_mpname );
+                LOGGER_log("%s:%d:%s:ERROR: Attempted to write %d bytes, but only managed %d to file '%s'",FL,__func__, readcount, writecount, dest_mpname );
             }
             fsize += writecount;
         }
     } while (readcount > 0);
 
     if ((*src_mpname != '\0')&&(readcount >= 0)) {
-        close(fin);
+        fclose(input_f);
     }
     if (readcount == -1) {
-        LOGGER_log("%s:%d:MIME_read_raw:ERROR: read() '%s'",FL, strerror(errno));
+        LOGGER_log("%s:%d:%s:ERROR: read() '%s'",FL,__func__, strerror(errno));
         return -1;
     }
-    close(fout);
+    fclose(result_f);
     if ( rw_buffer != NULL ) free( rw_buffer );
     return (size_t)(fsize);
 }
@@ -2008,7 +1860,7 @@ int MIME_read( char *mpname )
     buffer = malloc( MIME_MIME_READ_BUFFER_SIZE *sizeof(char) );
     if ( !buffer )
     {
-        LOGGER_log("%s:%d:MIME_read:ERROR: could not allocate 4K of memory for file read buffer\n",FL );
+        LOGGER_log("%s:%d:%s:ERROR: could not allocate 4K of memory for file read buffer\n",FL,__func__ );
         return -1;
     }
     /* open up our input file */
@@ -2016,7 +1868,7 @@ int MIME_read( char *mpname )
     /* check that out file opened up okay */
     if (!fout)
     {
-        LOGGER_log("%s:%d:MIME_read:ERROR: Cannot open file %s for writing... check permissions perhaps?",FL,mpname);
+        LOGGER_log("%s:%d:%s:ERROR: Cannot open file %s for writing... check permissions perhaps?",FL,__func__,mpname);
         //exit(_EXITERR_MIMEREAD_CANNOT_OPEN_OUTPUT);
         return -1;
     }
@@ -2035,7 +1887,7 @@ int MIME_read( char *mpname )
 
                 if ( readcount != writecount )
                 {
-                    LOGGER_log("%s:%d:MIME_read:ERROR: Attempted to write %d bytes, but only managed %d to file '%s'",FL, readcount, writecount, mpname );
+                    LOGGER_log("%s:%d:%s:ERROR: Attempted to write %d bytes, but only managed %d to file '%s'",FL,__func__, readcount, writecount, mpname );
                 }
 
             } else {
@@ -2052,9 +1904,6 @@ int MIME_read( char *mpname )
     return (int)(fsize /1024);
 }
 
-
-
-
 /*------------------------------------------------------------------------
 Procedure:     MIME_init ID:1
 Purpose:       Initialise various required parameters to ensure a clean starting of
@@ -2063,16 +1912,14 @@ Input:
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int MIME_init( void )
+void MIME_init( void )
 {
-
     BS_init();          // Boundary-stack initialisations
     MIMEH_init();       // Initialise MIME header routines.
     UUENCODE_init();    // uuen:coding decoding initialisations
     FNFILTER_init();    // Filename filtering
-    MDECODE_init(); // ISO filename decoding initialisation
+    MDECODE_init();     // ISO filename decoding initialisation
     TNEF_init();        // TNEF decoder
-
 
     glb.header_defect_count = 0;
     glb.filecount = 0;
@@ -2084,12 +1931,10 @@ int MIME_init( void )
     glb.quiet = 0;
     glb.syslogging = 0;
     glb.stderrlogging = 1;
-    glb.unique_names = 0;
-    glb.save_headers = 0;
+    glb.dump_headers = 0;
     glb.no_nameless = 0;
     glb.mailbox_format = 0;
     glb.name_by_type = 0;
-    glb.rename_method = _MIME_RENAME_METHOD_INFIX;
 
     glb.header_longsearch = 0;
     glb.max_recursion_level = _RECURSION_LEVEL_DEFAULT;
@@ -2112,10 +1957,8 @@ int MIME_init( void )
 
     glb.subject[0]='\0';
 
-    return 0;
+    all_MIME_elements_init();
 }
-
-
 
 /*-----------------------------------------------------------------\
   Function Name : MIME_generate_multiple_hardlink_filenames
@@ -2135,19 +1978,24 @@ hardlinks to replicate this in our output.
 Changes:
 
 \------------------------------------------------------------------*/
-int MIME_generate_multiple_hardlink_filenames(struct MIMEH_header_info *hinfo, char *unpackdir)
+void MIME_generate_multiple_hardlink_filenames(struct MIMEH_header_info *hinfo, RIPMIME_output *unpack_metadata)
 {
     char *name;
-    char oldname[1024];
+    char *oldfn;
+    int fn_l = strlen(unpack_metadata->dir) + strlen(hinfo->filename) + sizeof(char) * 2;
 
-    if (glb.multiple_filenames == 0) return 0;
+    if (glb.multiple_filenames == 0)
+       return;
 
-    //LOGGER_log("%s:%d:MIME_generate_multiple_hardlink_filenames:DEBUG: Generating hardlinks for %s",FL, hinfo->filename);
-    snprintf(oldname,sizeof(oldname),"%s/%s",unpackdir, hinfo->filename);
+    //LOGGER_log("%s:%d:MIME_generate_multiple_hardlink_filenames:DEBUG: Generating hardlinks for %s",FL,__func__, hinfo->filename);
+    oldfn = malloc(fn_l);
+    snprintf(oldfn,fn_l,"%s/%s",unpack_metadata->dir,hinfo->filename);
 
-    if (SS_count(&(hinfo->ss_names)) > 1){
-        do {
 
+    if (SS_count(&(hinfo->ss_names)) > 1)
+    {
+        do
+        {
             name = SS_pop(&(hinfo->ss_names));
             if (name != NULL)
             {
@@ -2159,14 +2007,14 @@ int MIME_generate_multiple_hardlink_filenames(struct MIMEH_header_info *hinfo, c
                 np = strrchr(name, '/');
                 if (np) np++; else np = name;
 
-                snprintf(newname,sizeof(newname),"%s/%s",unpackdir, np);
-                //LOGGER_log("%s:%d:MIME_generate_multiple_hardlink_filenames:DEBUG: Linking %s->%s",FL,newname, oldname);
-                rv = link(oldname, newname);
+                snprintf(newname,sizeof(newname),"%s/%s",unpack_metadata->dir, np);
+                //LOGGER_log("%s:%d:MIME_generate_multiple_hardlink_filenames:DEBUG: Linking %s->%s",FL,__func__,newname, oldfn);
+                rv = link(oldfn, newname);
                 if (rv == -1)
                 {
                     if (errno != EEXIST)
                     {
-                        LOGGER_log("%s:%d:MIME_generate_multiple_hardlink_filenames:WARNING: While trying to create '%s' link to '%s' (%s)",FL, newname, oldname,strerror(errno));
+                        LOGGER_log("%s:%d:%s:WARNING: While trying to create '%s' link to '%s' (%s)",FL,__func__, newname, oldfn,strerror(errno));
                     }
 
                 } else {
@@ -2176,27 +2024,26 @@ int MIME_generate_multiple_hardlink_filenames(struct MIMEH_header_info *hinfo, c
                     }
                 }
             }
-
         } while(name != NULL);
     }
 
     if (SS_count(&(hinfo->ss_filenames)) > 1) {
-        do {
-
+        do
+        {
             name = SS_pop(&(hinfo->ss_filenames));
             if (name != NULL)
             {
                 char newname[1024];
                 int rv;
 
-                snprintf(newname,sizeof(newname),"%s/%s",unpackdir, name);
-                //LOGGER_log("%s:%d:MIME_generate_multiple_hardlink_filenames:DEBUG: Linking %s->%s",FL,newname, oldname);
-                rv = link(oldname, newname);
+                snprintf(newname,sizeof(newname),"%s/%s",unpack_metadata->dir, name);
+                //LOGGER_log("%s:%d:MIME_generate_multiple_hardlink_filenames:DEBUG: Linking %s->%s",FL,__func__,newname, oldfn);
+                rv = link(oldfn, newname);
                 if (rv == -1)
                 {
                     if (errno != EEXIST)
                     {
-                        LOGGER_log("%s:%d:MIME_generate_multiple_hardlink_filenames:WARNING: While trying to create '%s' link to '%s' (%s)",FL, newname, oldname,strerror(errno));
+                        LOGGER_log("%s:%d:%s:WARNING: While trying to create '%s' link to '%s' (%s)",FL,__func__, newname, oldfn,strerror(errno));
                     }
 
                 } else {
@@ -2206,35 +2053,44 @@ int MIME_generate_multiple_hardlink_filenames(struct MIMEH_header_info *hinfo, c
                     }
                 }
             }
-
         } while(name != NULL);
     }
+    free(oldfn);
+}
 
-    return 0;
-
+MIME_element * resencapsulate(MIME_element *decoded_mime, int decode_result, struct MIMEH_header_info *hinfo)
+{
+    if (decoded_mime == NULL)
+    {
+        decoded_mime = malloc(sizeof(MIME_element));
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoded MIME NULL!! filename = '%s'",FL,__func__,hinfo->filename);
+    }
+    decoded_mime->decode_result_code = decode_result;
+    return decoded_mime;
 }
 
 /*------------------------------------------------------------------------
-Procedure:     MIME_decode_encoding ID:1
+Procedure:     MIME_process_content_transfer_encoding ID:1
 Purpose:       Based on the contents of hinfo, this function will call the
-required function needed to decode the contents of the file
-which is contained within the MIME structure
+               required function needed to decode the contents of the file
+               which is contained within the MIME structure
 Input:
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int MIME_decode_encoding( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hinfo, struct SS_object *ss )
+MIME_element* MIME_process_content_transfer_encoding( MIME_element* parent_mime, FFGET_FILE *input_f, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *hinfo, struct SS_object *ss )
 {
     int keep = 1;
-    int result = -1;
+    int decode_result = -1;
+    MIME_element* decoded_mime = NULL;
 
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Start:DEBUG: (%s)\n",FL, hinfo->filename);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Start:DEBUG: (%s)\n",FL,__func__, hinfo->filename);
 
     // If we have a valid filename, then put it through the process of
     //  cleaning and filtering
     if (isprint((int)hinfo->filename[0]))
     {
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Filename is valid, cleaning\n",FL);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Filename is valid, cleaning\n",FL,__func__);
         FNFILTER_filter(hinfo->filename, _MIMEH_FILENAMELEN_MAX);   /* check out thefilename for ISO filenames */
     }
 
@@ -2265,7 +2121,7 @@ int MIME_decode_encoding( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_in
             //      then we'll simply use the blankfileprefix.
             snprintf( hinfo->filename, _MIMEH_FILENAMELEN_MAX, "%s%d", glb.blankfileprefix, glb.filecount );
         }
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Filename is empty, setting to default...(%s)\n",FL, hinfo->filename);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Filename is empty, setting to default...(%s)\n",FL,__func__, hinfo->filename);
         if (glb.no_nameless) keep = 0;
         glb.filecount++;
     }
@@ -2279,9 +2135,9 @@ int MIME_decode_encoding( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_in
     // If we are required to have "unique" filenames for everything, rather than
     //  allowing ripMIME to overwrite stuff, then we put the filename through
     //      its tests here
-    if ((glb.unique_names)&&(keep))
+    if ((unpack_metadata->unique_names)&&(keep))
     {
-        MIME_test_uniquename( unpackdir, hinfo->filename, glb.rename_method );
+        MIME_test_uniquename( unpack_metadata, hinfo->filename );
     }
     // If the calling program requested verbosity, then indicate that we're decoding
     //      the file here
@@ -2310,7 +2166,7 @@ int MIME_decode_encoding( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_in
             // The format of the evaluation is:
             //
             //      (logic-test?true-expression:false-expression)
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: About to execute callback [0x%p]",FL,glb.filename_decoded_reporter);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: About to execute callback [0x%p]",FL,__func__,glb.filename_decoded_reporter);
             if (glb.filename_decoded_reporter != NULL)
             {
                 glb.filename_decoded_reporter( hinfo->filename, (MIMEH_get_verbosity_contenttype()?hinfo->content_type_string:NULL));
@@ -2318,13 +2174,16 @@ int MIME_decode_encoding( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_in
 
         } // If we were using the new filename telling format
     } // If we were telling the filename (verbosity)
-    if (1)
+
     {
         char *fp;
         /** Find the start of the filename. **/
         fp = strrchr(hinfo->filename, '/');
-        if (fp) fp++; else fp = hinfo->filename;
-        //LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Pushing filename %s to the stack",FL,fp);
+        if (fp)
+            fp++;
+        else
+            fp = hinfo->filename;
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Pushing filename %s to the stack",FL,__func__,fp);
         // 20040305-1419:PLD
         // Store the filename we're going to use to save the file to in the filename stack
         SS_push(ss, fp, strlen(fp));
@@ -2332,68 +2191,77 @@ int MIME_decode_encoding( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_in
     // Select the decoding method based on the content transfer encoding
     //  method which we read from the headers
 
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: ENCODING = %d\n",FL, hinfo->content_transfer_encoding);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: ENCODING = %d\n",FL,__func__, hinfo->content_transfer_encoding);
     switch (hinfo->content_transfer_encoding)
     {
         case _CTRANS_ENCODING_B64:
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Decoding BASE64 format\n",FL);
-            result = MIME_decode_64(f, unpackdir, hinfo);
-            switch (result) {
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding BASE64 format\n",FL,__func__);
+            decoded_mime = MIME_decode_std_64(parent_mime, input_f, unpack_metadata, hinfo);
+            decode_result = decoded_mime->decode_result_code;
+            switch (decode_result) {
                 case MIME_ERROR_B64_INPUT_STREAM_EOF:
                     break;
                 case MIME_BASE64_STATUS_HIT_BOUNDARY:
-                    result = 0;
+                    decode_result = 0;
                     break;
                 case 0:
-                    result = MIME_decode_64_cleanup(f, unpackdir, hinfo);
+                    decode_result = MIME_decode_std_64_cleanup(input_f);
                     break;
                 default:
                     break;
             }
             break;
         case _CTRANS_ENCODING_7BIT:
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Decoding 7BIT format\n",FL);
-            result = MIME_decode_text(f, unpackdir, hinfo, keep);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding 7BIT format\n",FL,__func__);
+
+ decoded_mime = MIME_decode_std_text(parent_mime, input_f, unpack_metadata, hinfo);decode_result = decoded_mime->decode_result_code;
             break;
         case _CTRANS_ENCODING_8BIT:
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Decoding 8BIT format\n",FL);
-            result = MIME_decode_text(f, unpackdir, hinfo, keep);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding 8BIT format\n",FL,__func__);
+            decoded_mime = MIME_decode_std_text(parent_mime, input_f, unpack_metadata, hinfo);
+            decode_result = decoded_mime->decode_result_code;
             break;
         case _CTRANS_ENCODING_BINARY:
         case _CTRANS_ENCODING_RAW:
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Decoding RAW format\n",FL);
-            result = MIME_decode_raw(f, unpackdir, hinfo, keep);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding RAW format\n",FL,__func__);
+            decoded_mime = MIME_decode_std_raw(parent_mime, input_f, unpack_metadata, hinfo);
+            decode_result = decoded_mime->decode_result_code;
             break;
         case _CTRANS_ENCODING_QP:
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Decoding Quoted-Printable format\n",FL);
-            result = MIME_decode_text(f, unpackdir, hinfo, keep);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding Quoted-Printable format\n",FL,__func__);
+            decoded_mime = MIME_decode_std_text(parent_mime, input_f, unpack_metadata, hinfo);
+            decode_result = decoded_mime->decode_result_code;
             break;
         case _CTRANS_ENCODING_UUENCODE:
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Decoding UUENCODED format\n",FL);
+            int fcount;
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding UUENCODED format\n",FL,__func__);
             // Added as a test - remove if we can get this to work in a better way
             snprintf(hinfo->uudec_name,sizeof(hinfo->uudec_name),"%s",hinfo->filename);
-            result = UUENCODE_decode_uu(f, unpackdir, hinfo->filename, hinfo->uudec_name, sizeof(hinfo->uudec_name), 0, keep );
-            glb.attachment_count += result;
+            fcount = UUENCODE_decode_uu(input_f, hinfo->uudec_name, 0, unpack_metadata, hinfo );
+            glb.attachment_count += fcount;
             // Because this is a file-count, it's not really an 'error result' as such, so, set the
             //      return code back to 0!
-            result = 0;
+            decode_result = 0;
             break;
         case _CTRANS_ENCODING_UNKNOWN:
             switch (hinfo->content_disposition) {
                 case _CDISPOSITION_FORMDATA:
-                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Decoding UNKNOWN format of FORMDATA disposition\n",FL);
-                    result = MIME_decode_raw(f, unpackdir, hinfo, keep);
+                    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding UNKNOWN format of FORMDATA disposition\n",FL,__func__);
+                    decoded_mime = MIME_decode_std_raw(parent_mime, input_f, unpack_metadata, hinfo);
+                    decode_result = decoded_mime->decode_result_code;
                     break;
                 default:
-                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Decoding UNKNOWN format\n",FL);
-                    result = MIME_decode_text(f, unpackdir, hinfo, keep);
+                    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding UNKNOWN format\n",FL,__func__);
+                    decoded_mime = MIME_decode_std_text(parent_mime, input_f, unpack_metadata, hinfo);
+                    decode_result = decoded_mime->decode_result_code;
             }
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: UNKNOWN Decode completed, result = %d\n",FL,result);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: UNKNOWN Decode completed, result = %d\n",FL,__func__,decode_result);
             break;
         case _CTRANS_ENCODING_UNSPECIFIED:
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Decoding UNSPECIFIED format\n",FL);
-            result = MIME_decode_text(f, unpackdir, hinfo, keep);
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Decoding result for UNSPECIFIED format = %d\n",FL, result);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding UNSPECIFIED format\n",FL,__func__);
+            decoded_mime = MIME_decode_std_text(parent_mime, input_f, unpack_metadata, hinfo);
+            decode_result = decoded_mime->decode_result_code;
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding result for UNSPECIFIED format = %d\n",FL,__func__, decode_result);
             // 20040114-1236:PLD: Added nested mail checking
             //
             // Sometimes mailpacks have false headers at the start, resulting
@@ -2405,40 +2273,42 @@ int MIME_decode_encoding( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_in
             //      because dud headers will always result in a UNSPECIFIED encoding
             //
             //  Original sample mailpack was sent by Farit - thanks.
-            if (1)
+            char *fn;
+            int fn_l = strlen(unpack_metadata->dir) + strlen(hinfo->filename) + sizeof(char) * 2;
+            fn = malloc(fn_l);
+            snprintf(fn,fn_l,"%s/%s",unpack_metadata->dir,hinfo->filename);
+            LOGGER_log("%s:%d:%s:DEBUG:REMOVEME: Testing for RFC822 headers in file %s",FL,__func__,fn);
+            if (MIME_is_diskfile_RFC822(fn) > 0 )
             {
-                snprintf(hinfo->scratch,sizeof(hinfo->scratch),"%s/%s",unpackdir,hinfo->filename);
-                LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG:REMOVEME: Testing for RFC822 headers in file %s",FL,hinfo->scratch);
-                if (MIME_is_file_RFC822(hinfo->scratch) > 0 )
-                {
-                    // 20040305-1304:PLD: unpack the file, propagate result upwards
-                    result = MIME_unpack_single( unpackdir, hinfo->scratch, (hinfo->current_recursion_level+1),ss );
-                }
+                // 20040305-1304:PLD: unpack the file, propagate result upwards
+                decode_result = MIME_unpack_single_diskfile( unpack_metadata, fn, (hinfo->current_recursion_level+ 1),ss );
             }
+            free(fn);
             break;
         default:
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Decoding format is not defined (%d)\n",FL, hinfo->content_transfer_encoding);
-            result = MIME_decode_raw(f, unpackdir, hinfo, keep);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding format is not defined (%d)\n",FL,__func__, hinfo->content_transfer_encoding);
+            decoded_mime = MIME_decode_std_raw(parent_mime, input_f, unpack_metadata, hinfo);
+            decode_result = decoded_mime->decode_result_code;
             break;
     }
     // Analyze our results
-    switch (result) {
+    switch (decode_result) {
         case 0:
             break;
         case MIME_STATUS_ZERO_FILE:
-            return MIME_STATUS_ZERO_FILE;
+            return resencapsulate(decoded_mime, MIME_STATUS_ZERO_FILE, hinfo);
             break;
         case MIME_ERROR_FFGET_EMPTY:
-            return result;
+            return resencapsulate(decoded_mime, decode_result, hinfo);
             break;
         case MIME_ERROR_RECURSION_LIMIT_REACHED:
-            return result;
+            return resencapsulate(decoded_mime, decode_result, hinfo);
             break;
-		  default: 
-				return result;
+        default:
+            return resencapsulate(decoded_mime, decode_result, hinfo);
     }
 
-    if ((result != -1)&&(result != MIME_STATUS_ZERO_FILE))
+    if ((decode_result != -1)&&(decode_result != MIME_STATUS_ZERO_FILE))
     {
 #ifdef RIPOLE
         // If we have OLE decoding active and compiled in, then
@@ -2448,7 +2318,7 @@ int MIME_decode_encoding( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_in
         //      performance of the ripMIME decoding engine
         if (glb.decode_ole > 0)
         {
-            MIME_decode_OLE( unpackdir, hinfo, 0 );
+            MIME_decode_OLE_diskfile( unpack_metadata, hinfo );
         }
 #endif
 
@@ -2460,9 +2330,9 @@ int MIME_decode_encoding( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_in
         //      side-effects
         if (hinfo->content_type == _CTYPE_TNEF)
         {
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Decoding TNEF format\n",FL);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding TNEF format\n",FL,__func__);
             glb.attachment_count++;
-            MIME_decode_TNEF( unpackdir, hinfo, 0 );
+            MIME_decode_TNEF( unpack_metadata, hinfo );
         } // Decode TNEF
 
         // Look for Microsoft MHT files... and try decode them.
@@ -2474,49 +2344,58 @@ int MIME_decode_encoding( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_in
         {
             if (glb.decode_mht != 0)
             {
+                char *fn;
+                int fn_l = strlen(unpack_metadata->dir) + strlen(hinfo->filename) + sizeof(char) * 2;
+
                 //  Patched 26-01-03: supplied by Chris Hine
-                if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Microsoft MHT format email filename='%s'\n",FL, hinfo->filename);
-                snprintf(hinfo->scratch,sizeof(hinfo->scratch),"%s/%s",unpackdir,hinfo->filename);
+                if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Microsoft MHT format email filename='%s'\n",FL,__func__, hinfo->filename);
+                fn = malloc(fn_l);
+                snprintf(fn,fn_l,"%s/%s",unpack_metadata->dir,hinfo->filename);
 
                 // 20040305-1304:PLD: unpack the file, propagate result upwards
-                result = MIME_unpack_single( unpackdir, hinfo->scratch, (hinfo->current_recursion_level+1),ss );
+                decode_result = MIME_unpack_single_diskfile( unpack_metadata, fn, (hinfo->current_recursion_level+ 1),ss );
+                free(fn);
             }
         } // Decode MHT files
-    } // If result != -1
+    } // If decode_result != -1
     // End.
 
-    MIME_generate_multiple_hardlink_filenames(hinfo,unpackdir);
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_decode_encoding:DEBUG: Done for filename = '%s'",FL,hinfo->filename);
-    return result;
+    MIME_generate_multiple_hardlink_filenames(hinfo,unpack_metadata);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Done for filename = '%s'",FL,__func__,hinfo->filename);
+    return resencapsulate(decoded_mime, decode_result, hinfo);
 }
 
 /*------------------------------------------------------------------------
 Procedure:     MIME_postdecode_cleanup ID:1
 Purpose:       Performs any cleanup operations required after the immediate completion of the mailpack decoding.
-Input:         char *unpackdir - directory where the mailpack was unpacked to
+Input:         RIPMIME_output *unpack_metadata - directory where the mailpack was unpacked to
 Output:        none
 Errors:
 ------------------------------------------------------------------------*/
-int MIME_postdecode_cleanup( char *unpackdir, struct SS_object *ss )
+int MIME_postdecode_cleanup( RIPMIME_output *unpack_metadata, struct SS_object *ss )
 {
-    char fullpath[256];
-    int result;
-    result = 0;
+    int result = 0;
     do {
         char *filename;
-        if (MIME_DNORMAL) LOGGER_log("%s:%d: Popping file...",FL);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s Popping file...",FL,__func__);
         filename = SS_pop(ss);
         if (filename == NULL) break;
-        if (MIME_DNORMAL) LOGGER_log("%s:%d: Popped file '%s'",FL, filename);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s Popped file '%s'",FL,__func__, filename);
         if ( strncmp( glb.blankfileprefix, filename, strlen( glb.blankfileprefix ) ) == 0 )
         {
-            snprintf( fullpath, sizeof(fullpath), "%s/%s", unpackdir, filename );
-            result = unlink( fullpath );
+            char *fn;
+            int fn_l = strlen(unpack_metadata->dir) + strlen(filename) + sizeof(char) * 2;
+
+            fn = malloc(fn_l);
+            snprintf(fn,fn_l,"%s/%s",unpack_metadata->dir,filename);
+
+            result = unlink( fn );
             if (MIME_VERBOSE)
             {
-                if (result == -1) LOGGER_log("Error removing '%s'; %s", fullpath, strerror(errno));
-                else LOGGER_log("Removed %s [status = %d]\n", fullpath, result );
+                if (result == -1) LOGGER_log("Error removing '%s'; %s", fn, strerror(errno));
+                else LOGGER_log("Removed %s [status = %d]\n", fn, result );
             }
+            free(fn);
         }
     } while (1);
     return 0;
@@ -2526,8 +2405,8 @@ int MIME_postdecode_cleanup( char *unpackdir, struct SS_object *ss )
   Function Name : MIME_handle_multipart
   Returns Type  : int
   ----Parameter List
-  1. FFGET_FILE *f,
-  2.  char *unpackdir,
+  1. FFGET_FILE *input_f,
+  2.  RIPMIME_output *unpack_metadata,
   3.  struct MIMEH_header_info *hinfo,
   4.  int current_recursion_level,
   5.  struct SS_object *ss ,
@@ -2541,10 +2420,12 @@ Comments:
 Changes:
 
 \------------------------------------------------------------------*/
-int MIME_handle_multipart( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *h, int current_recursion_level, struct SS_object *ss )
+int MIME_handle_multipart( MIME_element* parent_mime, FFGET_FILE *input_f, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *h, int current_recursion_level, struct SS_object *ss )
 {
+    MIME_element* decoded_mime = NULL;
+
     int result = 0;
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_handle_multipart:DEBUG: Decoding multipart/embedded \n",FL);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding multipart/embedded \n",FL,__func__);
     // If there is no filename, then we have a "standard"
     // embedded message, which can be just read off as a
     // continuous stream (simply with new boundaries
@@ -2559,29 +2440,33 @@ int MIME_handle_multipart( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_i
         //      layer of headers and get into the core of the message.  This is why we
         //      call unpack_stage2() because this function just reads the next set of
         //      headers and decodes.
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_handle_multipart:DEBUG: Non base64 encoding AND no filename, embedded message\n",FL);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Non base64 encoding AND no filename, embedded message\n",FL,__func__);
         h->boundary_located = 0;
-        result = MIME_unpack_stage2(f, unpackdir, h, current_recursion_level , ss);
+        result = MIME_unpack_stage2(input_f, unpack_metadata, h, current_recursion_level , ss);
         p = BS_top();
         if (p) PLD_strncpy(h->boundary, p,sizeof(h->boundary));
     } else {
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_handle_multipart:DEBUG: Embedded message has a filename, decoding to file %s",FL,h->filename);
-        result = MIME_decode_encoding( f, unpackdir, h, ss );
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Embedded message has a filename, decoding to file %s",FL,__func__,h->filename);
+        decoded_mime = MIME_process_content_transfer_encoding( parent_mime, input_f, unpack_metadata, h, ss );
+        result = decoded_mime->decode_result_code;
         if (result == 0)
         {
-            // Because we're calling MIME_unpack_single again [ie, recursively calling it
+            char *fn;
+            int fn_l = strlen(unpack_metadata->dir) + strlen(h->filename) + sizeof(char) * 2;
+
+            fn = malloc(fn_l);
+            snprintf(fn,fn_l,"%s/%s",unpack_metadata->dir,h->filename);
+            // Because we're calling MIME_unpack_single_diskfile again [ie, recursively calling it
             // we need to now adjust the input-filename so that it correctly is prefixed
             // with the directory we unpacked to.
 
-            snprintf(scratch,sizeof(scratch),"%s/%s",unpackdir, h->filename);
-            snprintf(h->filename,sizeof(h->filename),"%s",scratch);
-
-            //result = MIME_unpack_single( unpackdir, h->filename, current_recursion_level +1, ss);
-            result = MIME_unpack_single( unpackdir, h->filename, current_recursion_level, ss );
+            //result = MIME_unpack_single_diskfile( unpackdir, fn, current_recursion_level + 1, ss);
+            result = MIME_unpack_single_diskfile( unpack_metadata, fn, current_recursion_level, ss );
+            free(fn);
         }
 
     } // else-if transfer-encoding != B64 && filename was empty
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_handle_multipart:DEBUG: done handling '%s' result = %d",FL,h->filename, result);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: done handling '%s' result = %d",FL,__func__,h->filename, result);
     return result;
 }
 
@@ -2589,11 +2474,11 @@ int MIME_handle_multipart( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_i
   Function Name : MIME_handle_rfc822
   Returns Type  : int
   ----Parameter List
-  1. FFGET_FILE *f,                         Input stream
-  2.  char *unpackdir,                      Directory to write files to
+  1.  FFGET_FILE *input_f,             Input stream
+  2.  RIPMIME_output *unpack_metadata, Directory to write files to
   3.  struct MIMEH_header_info *hinfo, Header information structure
-  4.  int current_recursion_level,      Current recursion level
-  5.  struct SS_object *ss ,                String stack containing already decoded file names
+  4.  int current_recursion_level,     Current recursion level
+  5.  struct SS_object *ss ,           String stack containing already decoded file names
   ------------------
   Exit Codes    :
   Side Effects  :
@@ -2604,16 +2489,18 @@ Comments:
 Changes:
 
 \------------------------------------------------------------------*/
-int MIME_handle_rfc822( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *h, int current_recursion_level, struct SS_object *ss )
+int MIME_handle_rfc822( MIME_element* parent_mime, FFGET_FILE *input_f, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *h, int current_recursion_level, struct SS_object *ss )
 {
-    /** Decode a RFC822 encoded stream of data from *f  **/
+    MIME_element* decoded_mime = NULL;
+
+    /** Decode a RFC822 encoded stream of data from *input_f  **/
     int result = 0;
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_handle_rfc822:DEBUG: Decoding RFC822 message\n",FL);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding RFC822 message\n",FL,__func__);
     /** If there is no filename, then we have a "standard"
      ** embedded message, which can be just read off as a
      ** continuous stream (simply with new boundaries
      **/
-    DMIME LOGGER_log("%s:%d:MIME_handle_rfc822:DEBUG: Filename='%s', encoding = %d",FL, h->filename, h->content_transfer_encoding);
+    DMIME LOGGER_log("%s:%d:%s:DEBUG: Filename='%s', encoding = %d",FL,__func__, h->filename, h->content_transfer_encoding);
 
     //  if ((0)&&( h->content_transfer_encoding != _CTRANS_ENCODING_B64)&&( h->filename[0] == '0' )) 20041217-1635:PLD:
     if (( h->content_transfer_encoding != _CTRANS_ENCODING_B64)&&( h->filename[0] == '\0' ))
@@ -2627,31 +2514,35 @@ int MIME_handle_rfc822( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
         //      layer of headers and get into the core of the message.  This is why we
         //      call unpack_stage2() because this function just reads the next set of
         //      headers and decodes.
-        DMIME LOGGER_log("%s:%d:MIME_handle_rfc822:DEBUG: Non base64 encoding AND no filename, embedded message\n",FL);
+        DMIME LOGGER_log("%s:%d:%s:DEBUG: Non base64 encoding AND no filename, embedded message\n",FL,__func__);
         h->boundary_located = 0;
-        result = MIME_unpack_stage2(f, unpackdir, h, current_recursion_level , ss);
+        result = MIME_unpack_stage2(input_f, unpack_metadata, h, current_recursion_level , ss);
         p = BS_top();
         if (p) PLD_strncpy(h->boundary, p,sizeof(h->boundary));
     } else {
         /** ...else... if the section has a filename or B64 type encoding, we need to put it through extra decoding **/
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_handle_rfc822:DEBUG: Embedded message has a filename, decoding to file %s",FL,h->filename);
-        result = MIME_decode_encoding( f, unpackdir, h, ss );
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_handle_rfc822:DEBUG: Result of extracting %s is %d",FL,h->filename, result);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Embedded message has a filename, decoding to file %s",FL,__func__,h->filename);
+        decoded_mime = MIME_process_content_transfer_encoding( parent_mime, input_f, unpack_metadata, h, ss );
+        result = decoded_mime->decode_result_code;
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Result of extracting %s is %d",FL,__func__,h->filename, result);
         if (result == 0) {
-            /** Because we're calling MIME_unpack_single again [ie, recursively calling it
+            char * fn;
+            int fn_l = strlen(unpack_metadata->dir) + strlen(h->filename) + sizeof(char) * 2;
+
+            fn = malloc(fn_l);
+            snprintf(fn,fn_l,"%s/%s",unpack_metadata->dir,h->filename);
+
+            /** Because we're calling MIME_unpack_single_diskfile again [ie, recursively calling it
               we need to now adjust the input-filename so that it correctly is prefixed
               with the directory we unpacked to. **/
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Now attempting to extract contents of '%s'",FL,__func__,h->filename);
 
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_handle_rfc822:DEBUG: Now attempting to extract contents of '%s'",FL,h->filename);
-            snprintf(scratch,sizeof(scratch),"%s/%s",unpackdir, h->filename);
-            snprintf(h->filename,sizeof(h->filename),"%s",scratch);
-
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_handle_rfc822:DEBUG: Now attempting to extract contents of '%s'",FL,scratch);
-            result = MIME_unpack_single( unpackdir, scratch, current_recursion_level, ss );
+            result = MIME_unpack_single_diskfile( unpack_metadata, fn, current_recursion_level, ss );
+            free(fn);
             result = 0;
         }
     } /** else-if transfer-encoding != B64 && filename was empty **/
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_handle_rfc822:DEBUG: done handling '%s' result = %d",FL,h->filename, result);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: done handling '%s' result = %d",FL,__func__,h->filename, result);
     return result;
 }
 
@@ -2659,8 +2550,8 @@ int MIME_handle_rfc822( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
   Function Name : MIME_handle_plain
   Returns Type  : int
   ----Parameter List
-  1. FFGET_FILE *f,
-  2.  char *unpackdir,
+  1. FFGET_FILE *input_f,
+  2.  RIPMIME_output *unpack_metadata,
   3.  struct MIMEH_header_info *h,
   4.  int current_recursion_level,
   5.  struct SS_object *ss ,
@@ -2674,23 +2565,30 @@ Comments:
 Changes:
 
 \------------------------------------------------------------------*/
-int MIME_handle_plain( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *h, int current_recursion_level, struct SS_object *ss )
+int MIME_handle_plain( MIME_element* parent_mime, FFGET_FILE *input_f, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *h, int current_recursion_level, struct SS_object *ss )
 {
-    /** Handle a plain text encoded data stream from *f **/
+    MIME_element* decoded_mime = NULL;
+
+    /** Handle a plain text encoded data stream from *input_f **/
     int result = 0;
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_handle_plain:DEBUG: Handling plain email",FL);
-    result = MIME_decode_encoding( f, unpackdir, h, ss );
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Handling plain email",FL,__func__);
+    decoded_mime = MIME_process_content_transfer_encoding( parent_mime, input_f, unpack_metadata, h, ss );
+    result = decoded_mime->decode_result_code;
     if ((result == MIME_ERROR_FFGET_EMPTY)||(result == 0))
     {
         /** Test for RFC822 content... if so, go decode it **/
-        snprintf(h->scratch,sizeof(h->scratch),"%s/%s",unpackdir,h->filename);
-        if (MIME_is_file_RFC822(h->scratch)==1)
+        char *fn;
+        int fn_l = strlen(unpack_metadata->dir) + strlen(h->filename) + sizeof(char) * 2;
+        fn = malloc(fn_l);
+        snprintf(fn,fn_l,"%s/%s",unpack_metadata->dir,h->filename);
+        if (MIME_is_diskfile_RFC822(fn)==1)
         {
-            /** If the file is RFC822, then decode it using MIME_unpack_single() **/
+            /** If the file is RFC822, then decode it using MIME_unpack_single_diskfile() **/
             if (glb.header_longsearch != 0) MIMEH_set_header_longsearch(glb.header_longsearch);
-            result = MIME_unpack_single( unpackdir, h->scratch, current_recursion_level, ss );
+            result = MIME_unpack_single_diskfile( unpack_metadata, fn, current_recursion_level, ss );
             if (glb.header_longsearch != 0) MIMEH_set_header_longsearch(0);
         }
+        free(fn);
     }
     return result;
 }
@@ -2703,33 +2601,35 @@ Input:
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info *hinfo, int current_recursion_level, struct SS_object *ss )
+int MIME_unpack_stage2( FFGET_FILE *input_f, RIPMIME_output *unpack_metadata, struct MIMEH_header_info *hinfo, int current_recursion_level, struct SS_object *ss )
 {
     int result = 0;
     struct MIMEH_header_info *h;
+    MIME_element* parent_mime = NULL;
+    MIME_element* decoded_mime = NULL;
     char *p;
 
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Start, recursion %d\n",FL, current_recursion_level);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Start, recursion %d\n",FL,__func__, current_recursion_level);
     if (current_recursion_level > glb.max_recursion_level)
     {
         /** Test for recursion limits **/
-        if (MIME_VERBOSE) LOGGER_log("%s:%d:MIME_unpack_stage2:WARNING: Current recursion level of %d is greater than permitted %d"\
-                ,FL, current_recursion_level, glb.max_recursion_level);
+        if (MIME_VERBOSE) LOGGER_log("%s:%d:%s:WARNING: Current recursion level of %d is greater than permitted %d"\
+                ,FL,__func__, current_recursion_level, glb.max_recursion_level);
         return MIME_ERROR_RECURSION_LIMIT_REACHED; // 20040306-1301:PLD
     }
     h = hinfo;
     // Get our headers and determin what we have...
     //
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Parsing headers (initial)\n",FL);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Parsing headers (initial)\n",FL,__func__);
     // Parse the headers, extracting what information we need
     /** 20041216-1102:PLD: Keep attempting to read headers until we get a sane set **/
     do {
         /** Read next set of headers, repeat until a sane set of headers are found **/
-        result = MIMEH_parse_headers(f,h);
-        DMIME LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Parsing of headers done, sanity = %d, result = %d",FL,h->sanity, result);
+        result = MIMEH_parse_headers(NULL, NULL, input_f,h,unpack_metadata, 0, 0);
+        DMIME LOGGER_log("%s:%d:%s:DEBUG: Parsing of headers done, sanity = %d, result = %d",FL,__func__,h->sanity, result);
     } while ((h->sanity == 0)&&(result != -1));
 
-    DMIME LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Repeat loop of header-reading done, sanity = %d, result = %d",FL,h->sanity, result);
+    DMIME LOGGER_log("%s:%d:%s:DEBUG: Repeat loop of header-reading done, sanity = %d, result = %d",FL,__func__,h->sanity, result);
     glb.header_defect_count += MIMEH_get_defect_count(h);
     // Test the result output
     switch (result) {
@@ -2741,12 +2641,12 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
     //      this will give us the 'main' subject of the entire email and prevent
     //      and subsequent subjects from clobbering it.
     //if (glb.subject[0] == '\0') snprintf(glb.subject, _MIME_STRLEN_MAX, "%s", h->subject );
-    if ((strlen(glb.subject) < 1)&&(h->subject != NULL)&&(strlen(h->subject) > 0))
+    if ((strlen(glb.subject) < 1) && (strlen(h->subject) > 0))
     {
         snprintf(glb.subject, sizeof(glb.subject), "%s", h->subject );
     }
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Headers parsed, Result = %d, Boundary located = %d\n"\
-            ,FL,result, hinfo->boundary_located);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Headers parsed, Result = %d, Boundary located = %d\n"\
+            ,FL,__func__,result, hinfo->boundary_located);
 
     // Test to see if we encountered any DoubleCR situations while we
     //      were processing the headers.  If we did encounter a doubleCR
@@ -2754,7 +2654,7 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
     //      flag.
     if (MIMEH_get_doubleCR() != 0)
     {
-        MIME_doubleCR_decode( MIMEH_get_doubleCR_name(), unpackdir, h, current_recursion_level);
+        MIME_doubleCR_decode( MIMEH_get_doubleCR_name(), unpack_metadata, h, current_recursion_level);
         MIMEH_set_doubleCR( 0 );
         FFGET_SDL_MODE = 0;
     }
@@ -2767,7 +2667,7 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
         char *lbc;
         char *fbc;
 
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Boundary located, pushing to stack (%s)\n",FL,h->boundary);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Boundary located, pushing to stack (%s)\n",FL,__func__,h->boundary);
         BS_push(h->boundary);
 
         // Get the first and last character positions of the boundary
@@ -2778,23 +2678,23 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
         // Circumvent attempts to trick the boundary
         //      Even though we may end up pushing 3 boundaries to the stack
         //      they will be popped off if they're not needed.
-        if (*fbc == '"') { BS_push((fbc +1)); MIMEH_set_defect( hinfo, MIMEH_DEFECT_UNBALANCED_BOUNDARY_QUOTE); }
+        if (*fbc == '"') { BS_push((fbc + 1)); MIMEH_set_defect( hinfo, MIMEH_DEFECT_UNBALANCED_BOUNDARY_QUOTE); }
         if (*lbc == '"') { *lbc = '\0'; BS_push(h->boundary); *lbc = '"'; MIMEH_set_defect( hinfo, MIMEH_DEFECT_UNBALANCED_BOUNDARY_QUOTE); }
         h->boundary_located = 0;
     } else {
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Decoding in BOUNDARY-LESS mode\n",FL);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding in BOUNDARY-LESS mode\n",FL,__func__);
         if (h->content_type == _CTYPE_RFC822)
         {
             // Pass off to the RFC822 handler
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Decoding with RFC822 decoder\n",FL);
-            result = MIME_handle_rfc822(f,unpackdir,h,current_recursion_level,ss);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding with RFC822 decoder\n",FL,__func__);
+            result = MIME_handle_rfc822( parent_mime, input_f,unpack_metadata,h,current_recursion_level,ss);
         } else if (MIMEH_is_contenttype(_CTYPE_MULTIPART, h->content_type)) {
             // Pass off to the multipart handler
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Decoding with Multipart decoder\n",FL);
-            result = MIME_handle_multipart(f,unpackdir,h,current_recursion_level,ss);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding with Multipart decoder\n",FL,__func__);
+            result = MIME_handle_multipart( parent_mime, input_f,unpack_metadata,h,current_recursion_level,ss);
         } else {
-            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Decoding boundaryless file (%s)...\n",FL,h->filename);
-            result = MIME_handle_plain( f, unpackdir,h,current_recursion_level,ss);
+            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding boundaryless file (%s)...\n",FL,__func__,h->filename);
+            result = MIME_handle_plain( parent_mime, input_f, unpack_metadata,h,current_recursion_level,ss);
         } // else-if content was RFC822 or multi-part
         return result;
     } // End of the boundary-LESS mode ( processing the mail which has no boundaries in the primary headers )
@@ -2802,13 +2702,14 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
     if ((BS_top()!=NULL)&&(result == 0))
     {
         // Commence decoding WITH boundary awareness.
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Decoding with boundaries (filename = %s)\n",FL,h->filename);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding with boundaries (filename = %s)\n",FL,__func__,h->filename);
 
         // Decode the data in the current MIME segment
         // based on the header information retrieved from
         // the start of this function.
-        result = MIME_decode_encoding(f, unpackdir, h, ss);
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Done decoding, result = %d",FL,result);
+        decoded_mime = MIME_process_content_transfer_encoding( parent_mime, input_f, unpack_metadata, h, ss);
+        result = decoded_mime->decode_result_code;
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Done decoding, result = %d",FL,__func__,result);
         if (result == 0)
         {
             if (BS_top()!=NULL)
@@ -2824,13 +2725,13 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
                     h->content_transfer_encoding = -1;
                     h->content_disposition = -1;
 
-                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Decoding headers...\n",FL);
+                    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding headers...\n",FL,__func__);
                     do {
-                        result = MIMEH_parse_headers(f,h);
+                        result = MIMEH_parse_headers(NULL, NULL, input_f, h, unpack_metadata, 0, 0);
                     } while ((h->sanity == 0)&&(result != -1));
 
                     glb.header_defect_count += MIMEH_get_defect_count(h);
-                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Mime header parsing result = %d\n",FL, result);
+                    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Mime header parsing result = %d\n",FL,__func__, result);
                     // 20040305-1331:PLD
                     if (result == -1)
                     {
@@ -2840,7 +2741,7 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
 
                     if (h->boundary_located)
                     {
-                        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Pushing boundary %s\n",FL, h->boundary);
+                        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Pushing boundary %s\n",FL,__func__, h->boundary);
                         BS_push(h->boundary);
                         h->boundary_located = 0;
                     }
@@ -2859,7 +2760,7 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
                                 || (MIMEH_is_contenttype(_CTYPE_MULTIPART, h->content_type))\
                             )
                         {
-                            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Multipart/RFC822 mail headers found\n",FL);
+                            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Multipart/RFC822 mail headers found\n",FL,__func__);
                             /* If there is no filename, then we have a "standard"
                              * embedded message, which can be just read off as a
                              * continuous stream (simply with new boundaries */
@@ -2871,11 +2772,11 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
                                 // the file into ripMIME.  Certainly, this is not
                                 // the most efficent way of dealing with nested emails
                                 // however, it is a rather robust/reliable way.
-                                if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Chose Content-type == RFC822 clause",FL);
-                                if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Calling MIME_decode_encoding()",FL);
-                                result = MIME_handle_rfc822(f,unpackdir,h,current_recursion_level,ss);
+                                if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Chose Content-type == RFC822 clause",FL,__func__);
+                                if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Calling MIME_process_content_transfer_encoding()",FL,__func__);
+                                result = MIME_handle_rfc822(parent_mime, input_f,unpack_metadata,h,current_recursion_level,ss);
                                 // First up - extract the RFC822 body out of the parent mailpack
-                                // XX result = MIME_decode_encoding( f, unpackdir, h, ss );
+                                // XX result = MIME_process_content_transfer_encoding( input_f, unpackdir, h, ss );
 
                                 // Now decode the RFC822 body.
                                 /**
@@ -2884,10 +2785,10 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
                                   {
                                   snprintf(scratch,sizeof(scratch),"%s/%s",unpackdir, h->filename);
                                   snprintf(h->filename,sizeof(h->filename),"%s",scratch);
-                                  if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Now calling MIME_unpack_single() on the file '%s' for our RFC822 decode operation.",FL, scratch);
-                                //result = MIME_unpack_single( unpackdir, h->filename, current_recursion_level +1, ss);
-                                result = MIME_unpack( unpackdir, h->filename, current_recursion_level +1  );
-                                if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Unpack result = %d", FL, result);
+                                  if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Now calling MIME_unpack_single_diskfile() on the file '%s' for our RFC822 decode operation.",FL,__func__, scratch);
+                                //result = MIME_unpack_single_diskfile( unpackdir, h->filename, current_recursion_level + 1, ss);
+                                result = MIME_unpack( unpackdir, h->filename, current_recursion_level + 1  );
+                                if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Unpack result = %d", FL,__func__, result);
                                 result = 0;
                                 } else return result; // 20040305-1312:PLD
                                 */
@@ -2898,9 +2799,9 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
                                 // To be honest, i've forgotten what this section of test is supposed to pick out
                                 // in terms of files - certainly it does pick out some, but I'm not sure what format
                                 // they are.  Shame on me for not remembering, in future I must comment more.
-                                if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: NON-BASE64 DECODE\n",FL);
+                                if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: NON-BASE64 DECODE\n",FL,__func__);
                                 h->boundary_located = 0;
-                                result = MIME_unpack_stage2(f, unpackdir, h, current_recursion_level , ss);
+                                result = MIME_unpack_stage2(input_f, unpack_metadata, h, current_recursion_level , ss);
 
                                 // When we've exited from decoding the sub-mailpack, we need to restore the original
                                 // boundary
@@ -2916,25 +2817,28 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
                             //      and embedded format, it does not have the normal headers->[headers->data]
                             //      layout of other nested emails
 
-                            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Handle Appledouble explicitly",FL);
-                            result = MIME_unpack_stage2(f, unpackdir, h, current_recursion_level , ss);
+                            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Handle Appledouble explicitly",FL,__func__);
+                            result = MIME_unpack_stage2(input_f, unpack_metadata, h, current_recursion_level , ss);
 
                         } else {
-                            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: RFC822 Message to be decoded...\n",FL);
-                            result = MIME_decode_encoding( f, unpackdir, h, ss );
+                            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: RFC822 Message to be decoded...\n",FL,__func__);
+                            decoded_mime = MIME_process_content_transfer_encoding( parent_mime, input_f, unpack_metadata, h, ss );
+                            result = decoded_mime->decode_result_code;
                             if (result != 0) return result; // 20040305-1313:PLD
                             else
                             {
-                                if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Now running ripMIME over decoded RFC822 message...\n",FL);
+                                char * fn;
+                                int fn_l = strlen(unpack_metadata->dir) + strlen(h->filename) + sizeof(char) * 2;
+                                if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Now running ripMIME over decoded RFC822 message...\n",FL,__func__);
 
-                                // Because we're calling MIME_unpack_single again [ie, recursively calling it
+                                // Because we're calling MIME_unpack_single_diskfile again [ie, recursively calling it
                                 // we need to now adjust the input-filename so that it correctly is prefixed
                                 // with the directory we unpacked to.
-
-                                snprintf(scratch,sizeof(scratch),"%s/%s",unpackdir, h->filename);
-                                snprintf(h->filename,sizeof(h->filename),"%s",scratch);
-                                //result = MIME_unpack_single( unpackdir, h->filename, current_recursion_level +1, ss);
-                                result = MIME_unpack_single( unpackdir, h->filename, current_recursion_level,ss );
+                                fn = malloc(fn_l);
+                                snprintf(fn,fn_l,"%s/%s",unpack_metadata->dir,h->filename);
+                                //result = MIME_unpack_single_diskfile( unpackdir, fn, current_recursion_level + 1, ss);
+                                result = MIME_unpack_single_diskfile( unpack_metadata, fn, current_recursion_level,ss );
+                                free(fn);
                             }
 
                         } // else-if transfer-encoding wasn't B64 and filename was blank
@@ -2942,10 +2846,11 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
                             // If the attachment included in this MIME segment is NOT a
                             // multipart or RFC822 embedded email, we can then simply use
                             // the normal decoding function to interpret its data.
-                            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Decoding a normal attachment \n",FL);
-                            result = MIME_decode_encoding( f, unpackdir, h, ss );
+                            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding a normal attachment \n",FL,__func__);
+                            decoded_mime = MIME_process_content_transfer_encoding( parent_mime, input_f, unpack_metadata, h, ss );
+                            result = decoded_mime->decode_result_code;
 
-                            if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Decoding a normal attachment '%s' done. \n",FL, h->filename);
+                            if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Decoding a normal attachment '%s' done. \n",FL,__func__, h->filename);
                             // See if we have an attachment output which is actually another
                             //      email.
                             //
@@ -2957,14 +2862,14 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
                             {
                                 char *mime_fname;
 
-                                mime_fname = PLD_dprintf("%s/%s", unpackdir, h->filename);
+                                mime_fname = PLD_dprintf("%s/%s", unpack_metadata->dir, h->filename);
                                 if(mime_fname != NULL)
                                 {
-                                    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Testing '%s' for email type",FL,mime_fname);
-                                    if (MIME_is_file_RFC822(mime_fname))
+                                    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Testing '%s' for email type",FL,__func__,mime_fname);
+                                    if (MIME_is_diskfile_RFC822(mime_fname))
                                     {
-                                        //MIME_unpack_single( unpackdir, mime_fname, (hinfo->current_recursion_level+1), ss);
-                                        MIME_unpack_single( unpackdir, mime_fname, current_recursion_level+1,ss);
+                                        //MIME_unpack_single_diskfile( unpackdir, mime_fname, (hinfo->current_recursion_level+ 1), ss);
+                                        MIME_unpack_single_diskfile( unpack_metadata, mime_fname, current_recursion_level+ 1,ss);
                                     }
                                     free(mime_fname);
                                 }
@@ -2983,7 +2888,7 @@ int MIME_unpack_stage2( FFGET_FILE *f, char *unpackdir, struct MIMEH_header_info
             } // if MIME_BS_top()
         } // if result == 0
     } // if (result)
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_stage2:DEBUG: Exiting with result=%d recursion=%d\n",FL,result, current_recursion_level);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Exiting with result=%d recursion=%d\n",FL,__func__,result, current_recursion_level);
     return result;
 }
 
@@ -2994,9 +2899,9 @@ Input:
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int MIME_unpack_mailbox( char *unpackdir, char *mpname, int current_recursion_level, struct SS_object *ss )
+int MIME_unpack_mailbox( RIPMIME_output *unpack_metadata, char *mpname, int current_recursion_level, struct SS_object *ss )
 {
-    FFGET_FILE f;
+    FFGET_FILE input_f;
     FILE *fi;
     FILE *fo;
     char fname[1024];
@@ -3006,17 +2911,16 @@ int MIME_unpack_mailbox( char *unpackdir, char *mpname, int current_recursion_le
     int result;
     int input_is_stdin=0;
 
-    snprintf(fname,sizeof(fname),"%s/tmp.email000.mailpack",unpackdir);
+    snprintf(fname,sizeof(fname),"%s/tmp.email000.mailpack",unpack_metadata->dir);
     if ((mpname[0] == '-')&&(mpname[1] == '\0'))
     {
         fi = stdin;
         input_is_stdin=1;
     } else {
-        //      fi = fopen(mpname,"r");
-        if (strcmp(mpname,"-")==0) fi = stdin; else fi = fopen(mpname,"r"); // 20040208-1715:PLD
+        fi = (strcmp(mpname,"-")==0) ? stdin : fopen(mpname,"r");
         if (!fi)
         {
-            LOGGER_log("%s:%d:MIME_unpack_mailbox:ERROR: Cannot open '%s' for reading (%s)",FL, mpname,strerror(errno));
+            LOGGER_log("%s:%d:%s:ERROR: Cannot open '%s' for reading (%s)",FL,__func__, mpname,strerror(errno));
             return -1;
         }
     }
@@ -3024,12 +2928,12 @@ int MIME_unpack_mailbox( char *unpackdir, char *mpname, int current_recursion_le
     fo = fopen(fname,"w");
     if (!fo)
     {
-        LOGGER_log("%s:%d:MIME_unpack_mailbox:ERROR: Cannot open '%s' for writing  (%s)",FL, fname,strerror(errno));
+        LOGGER_log("%s:%d:%s:ERROR: Cannot open '%s' for writing  (%s)",FL,__func__, fname,strerror(errno));
         return -1;
     }
 
-    FFGET_setstream(&f, fi);
-    while (FFGET_fgets(line,sizeof(line),&f))
+    FFGET_setstream(&input_f, fi);
+    while (FFGET_fgets(line,sizeof(line),&input_f))
     {
         // If we have the construct of "\n\rFrom ", then we
         //      can be -pretty- sure that a new email is about
@@ -3040,17 +2944,17 @@ int MIME_unpack_mailbox( char *unpackdir, char *mpname, int current_recursion_le
             // Close the mailpack
             fclose(fo);
             // Now, decode the mailpack
-            //MIME_unpack_single(unpackdir, fname, current_recursion_level, ss);
+            //MIME_unpack_single_diskfile(unpackdir, fname, current_recursion_level, ss);
             // 20040317-2358:PLD
-            MIME_unpack_single(unpackdir, fname, current_recursion_level ,ss );
+            MIME_unpack_single_diskfile(unpack_metadata, fname, current_recursion_level ,ss );
             // Remove the now unpacked mailpack
             result = remove(fname);
             if (result == -1)
             {
-                LOGGER_log("%s:%d:MIME_unpack_mailbox:ERROR: removing temporary mailpack '%s' (%s)",FL, fname,strerror(errno));
+                LOGGER_log("%s:%d:%s:ERROR: removing temporary mailpack '%s' (%s)",FL,__func__, fname,strerror(errno));
             }
             // Create a new mailpack filename, and keep on going...
-            snprintf(fname,sizeof(fname),"%s/tmp.email%03d.mailpack",unpackdir,++mcount);
+            snprintf(fname,sizeof(fname),"%s/tmp.email%03d.mailpack",unpack_metadata->dir,++mcount);
             fo = fopen(fname,"w");
         }
         else
@@ -3085,23 +2989,23 @@ int MIME_unpack_mailbox( char *unpackdir, char *mpname, int current_recursion_le
     fclose(fo);
 
     // Now, decode the mailpack
-    //MIME_unpack_single(unpackdir, fname, current_recursion_level, ss);
+    //MIME_unpack_single_diskfile(unpackdir, fname, current_recursion_level, ss);
     // 20040317-2358:PLD
-    MIME_unpack_single(unpackdir, fname, current_recursion_level , ss );
+    MIME_unpack_single_diskfile(unpack_metadata, fname, current_recursion_level , ss );
     // Remove the now unpacked mailpack
     result = remove(fname);
     if (result == -1)
     {
-        LOGGER_log("%s:%d:MIME_unpack_mailbox:ERROR: removing temporary mailpack '%s' (%s)",FL, fname,strerror(errno));
+        LOGGER_log("%s:%d:%s:ERROR: removing temporary mailpack '%s' (%s)",FL,__func__, fname,strerror(errno));
     }
     return 0;
 }
 
 /*-----------------------------------------------------------------\
-  Function Name : MIME_unpack_single
+  Function Name : MIME_unpack_single_diskfile
   Returns Type  : int
   ----Parameter List
-  1. char *unpackdir,
+  1. RIPMIME_output *unpack_metadata,
   2.  char *mpname,
   3.  int current_recursion_level ,
   ------------------
@@ -3114,22 +3018,22 @@ Comments:
 Changes:
 
 \------------------------------------------------------------------*/
-int MIME_unpack_single( char *unpackdir, char *mpname, int current_recursion_level, struct SS_object *ss )
+int MIME_unpack_single_diskfile( RIPMIME_output *unpack_metadata, char *mpname, int current_recursion_level, struct SS_object *ss )
 {
     FILE *fi;           /* Pointer for the MIME file we're going to be going through */
     int result = 0;
 
     if (current_recursion_level > glb.max_recursion_level)
     {
-        LOGGER_log("%s:%d:MIME_unpack_single:WARNING: Current recursion level of %d is greater than permitted %d",FL, current_recursion_level, glb.max_recursion_level);
+        LOGGER_log("%s:%d:%s:WARNING: Current recursion level of %d is greater than permitted %d",FL,__func__, current_recursion_level, glb.max_recursion_level);
         return MIME_ERROR_RECURSION_LIMIT_REACHED;
     }
 
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_single:DEBUG: dir=%s packname=%s level=%d (max = %d)\n",FL, unpackdir, mpname, current_recursion_level, glb.max_recursion_level);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: dir=%s packname=%s level=%d (max = %d)\n",FL,__func__, unpack_metadata->dir, mpname, current_recursion_level, glb.max_recursion_level);
     /* if we're reading in from STDIN */
     if( mpname[0] == '-' && mpname[1] == '\0' )
     {
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_single:DEBUG: STDIN opened...\n",FL);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: STDIN opened...\n",FL,__func__);
         fi = stdin;
     }
     else
@@ -3137,37 +3041,37 @@ int MIME_unpack_single( char *unpackdir, char *mpname, int current_recursion_lev
         fi = fopen(mpname,"r");
         if (!fi)
         {
-            LOGGER_log("%s:%d:MIME_unpack_single:ERROR: Cannot open file '%s' for reading.\n",FL, mpname);
+            LOGGER_log("%s:%d:%s:ERROR: Cannot open file '%s' for reading.\n",FL,__func__, mpname);
             return -1;
         }
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_single:DEBUG: Input file (%s) opened...\n",FL, mpname);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Input file (%s) opened...\n",FL,__func__, mpname);
     }
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_single:DEBUG: Checking input streams...\n",FL);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Checking input streams...\n",FL,__func__);
     /* check to see if we had problems opening the file */
     if (fi == NULL)
     {
-        LOGGER_log("%s:%d:MIME_unpack_single:ERROR: Could not open mailpack file '%s' (%s)",FL, mpname, strerror(errno));
+        LOGGER_log("%s:%d:%s:ERROR: Could not open mailpack file '%s' (%s)",FL,__func__, mpname, strerror(errno));
         return -1;
     }
     // 20040317-2359:PLD
-    result = MIME_unpack_single_fp(unpackdir,fi,current_recursion_level , ss);
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_single:DEBUG: result = %d, recursion = %d, filename = '%s'", FL, result, current_recursion_level, mpname );
+    result = MIME_unpack_single_file(unpack_metadata,fi,current_recursion_level , ss);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: result = %d, recursion = %d, filename = '%s'", FL,__func__, result, current_recursion_level, mpname );
     if ((current_recursion_level > 1)&&(result == 241)) result = 0;
     fclose(fi);
     return result;
 }
 
 /*------------------------------------------------------------------------
-Procedure:     MIME_unpack_single ID:1
+Procedure:     MIME_unpack_single_diskfile ID:1
 Purpose:       Decodes a single mailpack file (as apposed to mailbox format) into its
 possible attachments and text bodies
-Input:         char *unpackdir: Directory to unpack the attachments to
+Input:         RIPMIME_output *unpack_metadata: Directory to unpack the attachments to
 char *mpname: Name of the mailpack we have to decode
 int current_recusion_level: Level of recursion we're currently at.
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int MIME_unpack_single_fp( char *unpackdir, FILE *fi, int current_recursion_level, struct SS_object *ss )
+int MIME_unpack_single_file( RIPMIME_output *unpack_metadata, FILE *fi, int current_recursion_level, struct SS_object *ss )
 {
     struct MIMEH_header_info h;
     int result = 0;
@@ -3175,39 +3079,47 @@ int MIME_unpack_single_fp( char *unpackdir, FILE *fi, int current_recursion_leve
 
     FFGET_FILE f;
     FILE *hf = NULL;
+    h.header_file = NULL;
     // Because this MIME module gets used in both CLI and daemon modes
     //  we should check to see that we can report to stderr
     //
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_single_fp:DEBUG: dir=%s level=%d (max = %d)\n",FL, unpackdir, current_recursion_level, glb.max_recursion_level);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: dir=%s level=%d (max = %d)\n",FL,__func__, unpack_metadata->dir, current_recursion_level, glb.max_recursion_level);
     if (current_recursion_level > glb.max_recursion_level)
     {
-        LOGGER_log("%s:%d:MIME_unpack_single_fp:WARNING: Current recursion level of %d is greater than permitted %d",FL, current_recursion_level, glb.max_recursion_level);
+        LOGGER_log("%s:%d:%s:WARNING: Current recursion level of %d is greater than permitted %d",FL,__func__, current_recursion_level, glb.max_recursion_level);
         //      return -1;
         return MIME_ERROR_RECURSION_LIMIT_REACHED; // 20040305-1302:PLD
         //return 0; // 20040208-1723:PLD
     }
-    else h.current_recursion_level = current_recursion_level;
+    else
+        h.current_recursion_level = current_recursion_level;
     glb.current_line = 0;
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_single_fp:DEBUG: recursion level checked...%d\n",FL, current_recursion_level);
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_single_fp:DEBUG: DumpHeaders = %d\n",FL, glb.save_headers);
-    if ((!hf)&&(glb.save_headers)&&(MIMEH_get_headers_save()==0))
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: recursion level checked...%d\n",FL,__func__, current_recursion_level);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: DumpHeaders = %d\n",FL,__func__, glb.dump_headers);
+    if ((!hf)&&(glb.dump_headers))
     {
+        char * fn;
+        int fn_l = strlen(unpack_metadata->dir) + strlen(glb.headersname) + sizeof(char) * 2;
+
+        fn = malloc(fn_l);
+        snprintf(fn,fn_l,"%s/%s",unpack_metadata->dir,glb.headersname);
+
         // Prepend the unpackdir path to the headers file name
-        snprintf(scratch,sizeof(scratch),"%s/%s",unpackdir, glb.headersname);
-        hf = fopen(scratch,"w");
+        hf = fopen(fn,"w");
         if (!hf)
         {
-            glb.save_headers = 0;
-            LOGGER_log("%s:%d:MIME_unpack_single_fp:ERROR: Cannot open '%s' for writing  (%s)",FL, glb.headersname,strerror(errno));
+            glb.dump_headers = 0;
+            LOGGER_log("%s:%d:%s:ERROR: Cannot open '%s' for writing  (%s)", FL,__func__, fn, strerror(errno));
         }
         else
         {
             headers_save_set_here = 1;
-            MIMEH_set_headers_save(hf);
+            h.header_file = hf;
         }
+        free(fn);
     }
 
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_single_fp:DEBUG: Setting up streams to decode\n",FL);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Setting up streams to decode\n",FL,__func__);
     FFGET_setstream(&f, fi);
     /** Initialize the header record **/
     h.boundary[0] = '\0';
@@ -3229,16 +3141,16 @@ int MIME_unpack_single_fp( char *unpackdir, FILE *fi, int current_recursion_leve
         }
     }
 
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_single_fp:DEBUG: preparing to decode, calling stage2...\n",FL);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: preparing to decode, calling stage2...\n",FL,__func__);
     // 20040318-0001:PLD
-    result = MIME_unpack_stage2(&f, unpackdir, &h, current_recursion_level +1, ss);
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_single_fp:DEBUG: done decoding ( in stage2 ) result=%d, to %s\n",FL, result, unpackdir);
+    result = MIME_unpack_stage2(&f, unpack_metadata, &h, current_recursion_level + 1, ss);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: done decoding ( in stage2 ) result=%d, to %s\n",FL,__func__, result, unpack_metadata->dir);
     //  fclose(fi); 20040208-1726:PLD
     if ( headers_save_set_here > 0 )
     {
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_single_fp:DEBUG: Closing header file.\n",FL);
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Closing header file.\n",FL,__func__);
         fflush(stdout);
-        MIMEH_set_headers_nosave();
+        h.header_file = NULL;
         fclose(hf);
     }
 
@@ -3246,7 +3158,7 @@ int MIME_unpack_single_fp( char *unpackdir, FILE *fi, int current_recursion_leve
     /** Flush out the string stacks **/
     SS_done(&(h.ss_filenames));
     SS_done(&(h.ss_names));
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack_single_fp:DEBUG: Done. Result=%d Recursion=%d\n",FL, result, current_recursion_level);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s:DEBUG: Done. Result=%d Recursion=%d\n",FL,__func__, result, current_recursion_level);
     return result;
     //  return status; // 20040305-1318:PLD
 }
@@ -3259,35 +3171,34 @@ Input:
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int MIME_unpack( char *unpackdir, char *mpname, int current_recursion_level )
+int MIME_unpack( RIPMIME_output *unpack_metadata, char *mpname, int current_recursion_level )
 {
     int result = 0;
     struct SS_object ss; // Stores the filenames that are created in the unpack operation
 
     if (current_recursion_level > glb.max_recursion_level) return MIME_ERROR_RECURSION_LIMIT_REACHED;
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack: Unpacking %s to %s, recursion level is %d",FL,mpname,unpackdir,current_recursion_level);
-    MIMEH_set_outputdir(unpackdir);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s: Unpacking %s to %s, recursion level is %d",FL,__func__,mpname,unpack_metadata->dir,current_recursion_level);
     if (MIME_DNORMAL) SS_set_debug(&ss,1);
     SS_init(&ss);
     if (glb.mailbox_format > 0)
     {
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack: Unpacking using mailbox format",FL);
-        result = MIME_unpack_mailbox( unpackdir, mpname, (current_recursion_level), &ss );
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s: Unpacking using mailbox format",FL,__func__);
+        result = MIME_unpack_mailbox( unpack_metadata, mpname, (current_recursion_level), &ss );
     }
     else
     {
-        if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack: Unpacking standard mailpack",FL,mpname,unpackdir,current_recursion_level);
-        result = MIME_unpack_single( unpackdir, mpname, (current_recursion_level +1), &ss );
+        if (MIME_DNORMAL) LOGGER_log("%s:%d:%s: Unpacking standard mailpack",FL,__func__,mpname,unpack_metadata->dir,current_recursion_level);
+        result = MIME_unpack_single_diskfile( unpack_metadata, mpname, (current_recursion_level + 1), &ss );
     }
 
     if (glb.no_nameless)
     {
-        MIME_postdecode_cleanup( unpackdir, &ss );
+        MIME_postdecode_cleanup( unpack_metadata, &ss );
     }
 
     if (MIME_DNORMAL)
     {
-        LOGGER_log("%s:%d:MIME_unpack: Files unpacked from '%s' (recursion=%d);",FL,mpname,current_recursion_level);
+        LOGGER_log("%s:%d:%s: Files unpacked from '%s' (recursion=%d);",FL,__func__,mpname,current_recursion_level);
         SS_dump(&ss);
     }
 
@@ -3312,24 +3223,32 @@ int MIME_unpack( char *unpackdir, char *mpname, int current_recursion_level )
 
     if (current_recursion_level == 0)
     {
-        //LOGGER_log("%s:%d:MIME_unpack:DEBUG: Clearing boundary stack",FL);
+        //LOGGER_log("%s:%d:%s:DEBUG: Clearing boundary stack",FL,__func__);
         BS_clear();
     }
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack: Unpacking of %s is done.",FL,mpname);
-    if (MIME_DNORMAL) LOGGER_log("%s:%d:MIME_unpack: -----------------------------------",FL);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s: Unpacking of %s is done.",FL,__func__,mpname);
+    if (MIME_DNORMAL) LOGGER_log("%s:%d:%s: -----------------------------------",FL,__func__);
     return result;
 }
 
 /*--------------------------------------------------------------------
  * MIME_close
  *
- * Closes the files used in MIME_unpack, such as headers etc */
-int MIME_close( void )
+ * Closes the files used in MIME_unpack, such as headers etc
+ * Writes memory FILE object content to disk if there is in-memory mode
+ */
+void MIME_close(RIPMIME_output *unpack_metadata)
 {
-    if (headers)
-    {
-        fclose(headers);
+
+    if (unpack_metadata->unpack_mode == RIPMIME_UNPACK_MODE_IN_MEMORY)
+        write_all_to_FS_files(unpack_metadata);
+
+    if (MIME_DNORMAL) {
+        LOGGER_log("%s:%d:%s: start.",FL,__func__);
+        printArray(all_MIME_elements.mime_arr);
     }
-    return 0;
+
+    freeArray(all_MIME_elements.mime_arr, unpack_metadata);
 }
-/*----------END OF MIME.c------------*/
+
+/* EOF */

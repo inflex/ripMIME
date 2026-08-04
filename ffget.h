@@ -13,21 +13,21 @@
 #define FFGET_DNORMAL   ((FFGET_debug >= FFGET_DEBUG_NORMAL  ))
 #define FFGET_DPEDANTIC ((FFGET_debug >= FFGET_DEBUG_PEDANTIC))
 
-#define FFGET_MAX_LINE_LEN 1024
-#define FFGET_BUFFER_MAX 8192
+#define FFGET_MAX_LINE_LEN 1024 * sizeof(char)
+#define FFGET_BUFFER_MAX 8192 * sizeof(char)
 #define FFGET_BUFFER_PADDING 1
 
 #define FFGET_DEBUG_NORMAL 1
 #define FFGET_DEBUG_PEDANTIC 10
 
-#define FFGET_LINEBREAK_NONE 0
-#define FFGET_LINEBREAK_LF 1
-#define FFGET_LINEBREAK_CR 2
+#define FFGET_LINEBREAK_NONE	0
+#define FFGET_LINEBREAK_LF		1
+#define FFGET_LINEBREAK_CR		2
 
 struct _FFGET_FILE
 {
 	FILE *f;
-	char buffer[FFGET_BUFFER_MAX+4];
+	char buffer[FFGET_BUFFER_MAX + 4 * sizeof(char)];
 	char *startpoint;
 	char *endpoint;
 	char *buffer_end;

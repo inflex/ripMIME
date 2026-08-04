@@ -8,6 +8,7 @@
 #include "pldstr.h"
 
 #include "bytedecoders.h"
+#include "mime_element.h"
 #include "olestream-unwrap.h"
 
 #define DUW if (oleuw->debug)
@@ -145,48 +146,29 @@ int OLEUNWRAP_set_save_unknown_streams( struct OLEUNWRAP_object *oleuw, int leve
  Changes:
  
 \------------------------------------------------------------------*/
-int OLEUNWRAP_save_stream( struct OLEUNWRAP_object *oleuw, char *fname, char *decode_path, char *stream, size_t bytes )
+int OLEUNWRAP_save_stream( struct OLEUNWRAP_object *oleuw, char *fname, RIPMIME_output *unpack_metadata, char *stream, size_t bytes )
 {
-	char *full_name;
-	FILE *f;
 	int result = 0;
+	MIME_element* cur_mime = NULL;
+	size_t write_count;
 
-	DUW LOGGER_log("%s:%d:OLEUNWRAP_save_stream:DEBUG: fname=%s, decodepath=%s, size=%ld"
-			,FL
+	DUW LOGGER_log("%s:%d:%s:DEBUG: fname=%s, decodepath=%s, size=%ld"
+			,FL,__func__
 			,fname
-			,decode_path
+			,unpack_metadata->dir
 			,bytes
 			);
 
-	full_name = PLD_dprintf("%s/%s", decode_path, fname );
-	if (full_name == NULL)
+	cur_mime = MIME_element_add (NULL, unpack_metadata, fname, "OLE", "OLE", "OLE", 0, 1, 0, __func__);
+
+	write_count = fwrite( stream, 1, bytes, cur_mime->f );
+	if (write_count != bytes)
 	{
-		LOGGER_log("%s:%d:OLEUNWRAP_save_stream:ERROR: Unable to create filename string from '%s' and '%s'",FL,fname,decode_path);
-		return -1;
+		LOGGER_log("%s:%d:%s:WARNING: Only wrote %d of %d bytes to file %s\n",FL,__func__, write_count, bytes, cur_mime->fullpath );
 	}
 
-	f = fopen(full_name,"w");
-	if (f != NULL)
-	{
-		size_t write_count;
-
-		write_count = fwrite( stream, 1, bytes, f );
-		if (write_count != bytes)
-		{
-			LOGGER_log("%s:%d:OLEUNWRAP_save_stream:WARNING: Only wrote %d of %d bytes to file %s\n",FL, write_count, bytes, full_name );
-		}
-
-		fclose(f);
-
-
-	} else {
-		LOGGER_log("%s:%d:OLEUNWRAP_save_stream:ERROR: Unable to open %s for writing (%s)\n",FL,full_name, strerror(errno));
-		result = -1;
-	}
-
-	if (full_name) free(full_name);
-
-	DUW LOGGER_log("%s:%d:OLEUNWRAP_save_stream:DEBUG: Done saving '%s'",FL, fname);
+	MIME_element_deactivate (cur_mime, unpack_metadata);
+	DUW LOGGER_log("%s:%d:%s:DEBUG: Done saving '%s'",FL,__func__, fname);
 
 	return result;
 }
@@ -268,7 +250,7 @@ int OLEUNWRAP_seach_for_file_sig( struct OLEUNWRAP_object *oleuw, char *block, s
 			p = tsp->sequence; /** set p to point to the start of the image signature sequence **/
 			cmpresult = memcmp(bp, p, 3);
 			if (cmpresult == 0) {
-				DUW LOGGER_log("%s:%d:OLEUNWRAP_seach_for_file_sig:DEBUG: Hit at offset %d for signature %d",FL,(bp-block),(tsp -sigs));
+				DUW LOGGER_log("%s:%d:%s:DEBUG: Hit at offset %d for signature %d",FL,__func__,(bp-block),(tsp -sigs));
 				hit = 1;
 				break;
 			} /** If we had a match in the signatures **/
@@ -290,8 +272,6 @@ int OLEUNWRAP_seach_for_file_sig( struct OLEUNWRAP_object *oleuw, char *block, s
 	return result;
 }
 
-
-
 	/** Look for PNG signature **/
 /*-----------------------------------------------------------------\
  Function Name	: OLEUNWRAP_decode_attachment
@@ -308,7 +288,7 @@ int OLEUNWRAP_seach_for_file_sig( struct OLEUNWRAP_object *oleuw, char *block, s
  Changes:
  
 \------------------------------------------------------------------*/
-int OLEUNWRAP_decode_attachment( struct OLEUNWRAP_object *oleuw, char *stream, size_t stream_size, char *decode_path )
+int OLEUNWRAP_decode_attachment( struct OLEUNWRAP_object *oleuw, char *stream, size_t stream_size, RIPMIME_output *unpack_metadata )
 {
 	struct OLE10_header oh;
 	char *sp = stream;
@@ -319,7 +299,7 @@ int OLEUNWRAP_decode_attachment( struct OLEUNWRAP_object *oleuw, char *stream, s
 	oh.attach_size_1 = (size_t)get_int32( sp );
 	sp += 4;
 
-	DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: attachsize = %d [ 0x%x ], stream length = %d [ 0x%x] \n", FL, oh.attach_size_1, oh.attach_size_1, stream_size, stream_size );
+	DUW LOGGER_log("%s:%d:%s:DEBUG: attachsize = %d [ 0x%x ], stream length = %d [ 0x%x] \n", FL,__func__, oh.attach_size_1, oh.attach_size_1, stream_size, stream_size );
 
 	oh.attach_start_offset = (stream_size -oh.attach_size_1);
 	data_start_point = stream +oh.attach_start_offset;
@@ -336,31 +316,31 @@ int OLEUNWRAP_decode_attachment( struct OLEUNWRAP_object *oleuw, char *stream, s
 		// check next 4 bytes.
 
 		cbheader = get_uint16( sp );
-		DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: cbHeader = %d [ 0x%x ]", FL, cbheader, cbheader);
+		DUW LOGGER_log("%s:%d:%s:DEBUG: cbHeader = %d [ 0x%x ]", FL,__func__, cbheader, cbheader);
 		mfpmm = get_uint16( sp +2 );
-		DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: mfp.mm = %d [ 0x%x ]", FL, mfpmm, mfpmm);
+		DUW LOGGER_log("%s:%d:%s:DEBUG: mfp.mm = %d [ 0x%x ]", FL,__func__, mfpmm, mfpmm);
 		mfpxext = get_uint16( sp +4 );
-		DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: mfp.xext = %d [ 0x%x ]", FL, mfpxext, mfpxext);
+		DUW LOGGER_log("%s:%d:%s:DEBUG: mfp.xext = %d [ 0x%x ]", FL,__func__, mfpxext, mfpxext);
 		mfpyext = get_uint16( sp +8 );
-		DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: mfp.yext = %d [ 0x%x ]", FL, mfpyext, mfpyext);
+		DUW LOGGER_log("%s:%d:%s:DEBUG: mfp.yext = %d [ 0x%x ]", FL,__func__, mfpyext, mfpyext);
 		mfphmf = get_uint16( sp +10 );
-		DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: mfp.hmf = %d [ 0x%x ]", FL, mfphmf, mfphmf);
+		DUW LOGGER_log("%s:%d:%s:DEBUG: mfp.hmf = %d [ 0x%x ]", FL,__func__, mfphmf, mfphmf);
 		// If we only had the stream byte-lenght in our header
 		//		then we know we don't have a complex header.
 		 
 		DUW {
 		switch (mfpmm) {
 			case 100:
-				LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: Image is Escher format",FL);
+				LOGGER_log("%s:%d:%s:DEBUG: Image is Escher format",FL,__func__);
 				break;
 			case 99:
-				LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: Image is Bitmapped",FL);
+				LOGGER_log("%s:%d:%s:DEBUG: Image is Bitmapped",FL,__func__);
 				break;
 			case 98:
-				LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: Image is TIFF",FL);
+				LOGGER_log("%s:%d:%s:DEBUG: Image is TIFF",FL,__func__);
 				break;
 			default:
-				LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: Unknown image type for code '%d'",FL, mfpmm);
+				LOGGER_log("%s:%d:%s:DEBUG: Unknown image type for code '%d'",FL,__func__, mfpmm);
 		}
 		}
 
@@ -371,25 +351,25 @@ int OLEUNWRAP_decode_attachment( struct OLEUNWRAP_object *oleuw, char *stream, s
 			int imageoffset = 0;
 			int search_size = 500;
 
-			DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: searcing for image signatures",FL);
+			DUW LOGGER_log("%s:%d:%s:DEBUG: searcing for image signatures",FL,__func__);
 			if (stream_size < (search_size +68)) search_size = (stream_size -69); /** just make sure we don't over-search the stream **/
 
 			imageoffset = OLEUNWRAP_seach_for_file_sig(oleuw, data_start_point, search_size);
 			if (imageoffset >= 0) {
-				DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: Image data found at offset %d",FL,imageoffset);
+				DUW LOGGER_log("%s:%d:%s:DEBUG: Image data found at offset %d",FL,__func__,imageoffset);
 				data_start_point += imageoffset;
 			} else {
-				DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: Could not detect image signature, dumping whole stream",FL);
+				DUW LOGGER_log("%s:%d:%s:DEBUG: Could not detect image signature, dumping whole stream",FL,__func__);
 			}
 		}
 			
 		oh.attach_name = PLD_dprintf("image-%ld",oh.attach_size_1);
 		oh.attach_size = oh.attach_size_1;
 		oh.fname_1 = oh.fname_2 = NULL;
-		DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: Setting attachment name to '%s', size = %d",FL,oh.attach_name, oh.attach_size);
+		DUW LOGGER_log("%s:%d:%s:DEBUG: Setting attachment name to '%s', size = %d",FL,__func__,oh.attach_name, oh.attach_size);
 	} else {
 
-		DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: Decoding file information header",FL);
+		DUW LOGGER_log("%s:%d:%s:DEBUG: Decoding file information header",FL,__func__);
 		// Unknown memory segment
 		memcpy( oh.data, sp, 2 );
 		sp += 2;
@@ -418,7 +398,7 @@ int OLEUNWRAP_decode_attachment( struct OLEUNWRAP_object *oleuw, char *stream, s
 		data_start_point = sp;
 	} 
 
-	DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: Attachment %s:%s:%s size = %d\n",FL, oh.attach_name, oh.fname_1, oh.fname_2, oh.attach_size );
+	DUW LOGGER_log("%s:%d:%s:DEBUG: Attachment %s:%s:%s size = %d\n",FL,__func__, oh.attach_name, oh.fname_1, oh.fname_2, oh.attach_size );
 
 
 	/** 20050119:2053:PLD - Added to sanitize 8-bit filenames **/
@@ -427,12 +407,12 @@ int OLEUNWRAP_decode_attachment( struct OLEUNWRAP_object *oleuw, char *stream, s
 	OLEUNWRAP_sanitize_filename(oh.fname_1);
 	OLEUNWRAP_sanitize_filename(oh.fname_2);
 
-	DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: Sanitized attachment filenames",FL);
+	DUW LOGGER_log("%s:%d:%s:DEBUG: Sanitized attachment filenames",FL,__func__);
 
-	result = OLEUNWRAP_save_stream( oleuw, oh.attach_name, decode_path, data_start_point, oh.attach_size );
+	result = OLEUNWRAP_save_stream( oleuw, oh.attach_name, unpack_metadata, data_start_point, oh.attach_size );
 	if (result == OLEUW_OK)
 	{
-		DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: Calling reporter for the filename",FL);
+		DUW LOGGER_log("%s:%d:%s:DEBUG: Calling reporter for the filename",FL,__func__);
 		if ((oleuw->verbose > 0)&&(oleuw->filename_report_fn != NULL))
 		{
 			oleuw->filename_report_fn(oh.attach_name);
@@ -440,13 +420,13 @@ int OLEUNWRAP_decode_attachment( struct OLEUNWRAP_object *oleuw, char *stream, s
 		// Do call back to reporting function
 	}
 
-	DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: Cleaning up",FL);
+	DUW LOGGER_log("%s:%d:%s:DEBUG: Cleaning up",FL,__func__);
 	// Clean up our previously allocated data
 	if (oh.fname_1 != NULL) free(oh.fname_1);
 	if (oh.attach_name != NULL) free(oh.attach_name);
 	if (oh.fname_2 != NULL) free(oh.fname_2);
 	
-	DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: done.",FL);
+	DUW LOGGER_log("%s:%d:%s:DEBUG: done.",FL,__func__);
 	return OLEUW_OK;
 }
 
@@ -466,23 +446,23 @@ int OLEUNWRAP_decode_attachment( struct OLEUNWRAP_object *oleuw, char *stream, s
  Changes:
  
 \------------------------------------------------------------------*/
-int OLEUNWRAP_decodestream( struct OLEUNWRAP_object *oleuw, char *element_string, char *stream, size_t stream_size, char *decode_path )
+int OLEUNWRAP_decodestream( struct OLEUNWRAP_object *oleuw, char *element_string, char *stream, size_t stream_size, RIPMIME_output *unpack_metadata )
 {
 	int result = OLEUW_OK;
 
 	if (strstr(element_string, OLEUW_ELEMENT_10NATIVE_STRING) != NULL) 
 	{
 		
-		DUW LOGGER_log("%s:%d:OLEUNWRAP_decodestream:DEBUG: Debugging element '%s'",FL, element_string);
-		OLEUNWRAP_decode_attachment( oleuw, stream, stream_size, decode_path );
+		DUW LOGGER_log("%s:%d:%s:DEBUG: Debugging element '%s'",FL,__func__, element_string);
+		OLEUNWRAP_decode_attachment( oleuw, stream, stream_size, unpack_metadata );
 
 	} else if (strstr(element_string, OLEUW_ELEMENT_DATA) != NULL)  {
 
-		DUW LOGGER_log("%s:%d:OLEUNWRAP_decodestream:DEBUG: Debugging element '%s'",FL, element_string);
-		OLEUNWRAP_decode_attachment( oleuw, stream, stream_size, decode_path );
+		DUW LOGGER_log("%s:%d:%s:DEBUG: Debugging element '%s'",FL,__func__, element_string);
+		OLEUNWRAP_decode_attachment( oleuw, stream, stream_size, unpack_metadata );
 
 	} else {
-		DUW LOGGER_log("%s:%d:OLEUNWRAP_decode_attachment:DEBUG: Unable to decode stream with element string '%s'\n", FL, element_string);
+		DUW LOGGER_log("%s:%d:%s:DEBUG: Unable to decode stream with element string '%s'\n", FL,__func__, element_string);
 		result = OLEUW_STREAM_NOT_DECODED;
 	}
 

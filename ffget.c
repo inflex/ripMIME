@@ -58,10 +58,10 @@ int FFGET_set_watch_SDL( int level )
   Function Name	: FFGET_set_allow_nul
   Returns Type	: int
   ----Parameter List
-  1. int level , 
+  1. int level ,
   ------------------
-  Exit Codes	: 
-  Side Effects	: 
+  Exit Codes	:
+  Side Effects	:
   --------------------------------------------------------------------
 Comments:
 This tells the FFGET_raw() if it needs to remove \0's or not
@@ -270,13 +270,13 @@ int FFGET_feof( FFGET_FILE *f )
   Function Name	: FFGET_seek
   Returns Type	: int
   ----Parameter List
-  1. FFGET_FILE *f, 
-  2.  size_t offset , 
+  1. FFGET_FILE *f,
+  2.  size_t offset ,
   ------------------
-  Exit Codes	: 
+  Exit Codes	:
   -1 = error, check logs for reason of failure.
 
-  Side Effects	: 
+  Side Effects	:
   --------------------------------------------------------------------
 Comments:
 Seeks to 'offset' bytes from the first byte of the file.
@@ -309,10 +309,10 @@ int FFGET_seek( FFGET_FILE *f, long offset, int whence )
   Function Name	: FFGET_tell
   Returns Type	: size_t
   ----Parameter List
-  1. FFGET_FILE *f , 
+  1. FFGET_FILE *f ,
   ------------------
-  Exit Codes	: 
-  Side Effects	: 
+  Exit Codes	:
+  Side Effects	:
   --------------------------------------------------------------------
 Comments:
 Returns the position in the file that the current "file cursor"

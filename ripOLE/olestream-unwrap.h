@@ -19,9 +19,9 @@ int OLEUNWRAP_set_debug( struct OLEUNWRAP_object *oleuw, int level );
 int OLEUNWRAP_set_verbose( struct OLEUNWRAP_object *oleuw, int level );
 int OLEUNWRAP_set_save_unknown_streams( struct OLEUNWRAP_object *oleuw, int level );
 
-int OLEUNWRAP_save_stream( struct OLEUNWRAP_object *oleuw, char *fname, char *decode_path, char *stream, size_t bytes );
-int OLEUNWRAP_decode_attachment( struct OLEUNWRAP_object *oleuw, char *stream, size_t stream_size, char *decode_path );
-int OLEUNWRAP_decodestream( struct OLEUNWRAP_object *oleuw, char *element_string, char *stream, size_t stream_size, char *decode_path );
+int OLEUNWRAP_save_stream( struct OLEUNWRAP_object *oleuw, char *fname, RIPMIME_output *unpack_metadata, char *stream, size_t bytes );
+int OLEUNWRAP_decode_attachment( struct OLEUNWRAP_object *oleuw, char *stream, size_t stream_size, RIPMIME_output *unpack_metadata );
+int OLEUNWRAP_decodestream( struct OLEUNWRAP_object *oleuw, char *element_string, char *stream, size_t stream_size, RIPMIME_output *unpack_metadata );
 
 int OLEUNWRAP_set_filename_report_fn( struct OLEUNWRAP_object *oleuw, int (*ptr_to_fn)(char *) );
 

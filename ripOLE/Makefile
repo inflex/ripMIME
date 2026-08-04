@@ -1,7 +1,6 @@
 
-OBJS= ole.o olestream-unwrap.o bytedecoders.o logger.o pldstr.o bt-int.o
+OBJS= ole.o olestream-unwrap.o bytedecoders.o logger.o pldstr.o bt-int.o mime_element.o
 CFLAGS=-Wall -g -O2 -I. 
-
 
 .c.o:
 	$(CC) $(CFLAGS) $(DEFINES) -c $*.c

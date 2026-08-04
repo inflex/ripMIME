@@ -3,7 +3,7 @@
 
 ### Features
 
-- Extracts all attachments even from multiple MUA personalities 
+- Extracts all attachments even from multiple MUA personalities
 
 
 ### TODO

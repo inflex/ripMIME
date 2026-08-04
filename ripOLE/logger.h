@@ -13,7 +13,7 @@
 #define _LOGGER_NULL 5
 
 #ifndef FL
-#define FL __FILE__,__LINE__
+#define FL __FILE__,__LINE__,__func__
 #endif
 
 int LOGGER_log( char *format, ...);

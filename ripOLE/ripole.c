@@ -8,6 +8,7 @@
 
 #include "logger.h"
 #include "pldstr.h"
+#include "mime_element.h"
 #include "ole.h"
 
 struct ripOLE_object {
@@ -309,6 +310,7 @@ int main( int argc, char **argv )
 {
 	struct ripOLE_object role;
 	struct OLE_object *ole = NULL;
+	RIPMIME_output o;
 	int result = 0;
 
 	if (argc == 1) { fprintf (stdout, "%s\n", help); exit(1); }
@@ -319,7 +321,6 @@ int main( int argc, char **argv )
 		LOGGER_log("ripOLE: Cannot allocate memory for OLE object");
 		return 1;
 	}
-
 
 	LOGGER_set_output_mode(_LOGGER_STDOUT);
 
@@ -335,8 +336,10 @@ int main( int argc, char **argv )
 
 	OLE_set_filename_report_fn(ole, ROLE_report_filename_decoded );
 
-	result = OLE_decode_file( ole, role.inputfile, role.outputdir );
-	OLE_decode_file_done(ole);
+	o.dir = role.outputdir;
+	o.unpack_mode = RIPMIME_UNPACK_MODE_TO_DIRECTORY;
+	result = OLE_decode_diskfile( ole, role.inputfile, &o );
+	OLE_decode_done(ole);
 
 	if ((result != 0)) {
 		if (role.verbose) {

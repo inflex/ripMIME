@@ -32,10 +32,9 @@ LIBS=
 #  DEBUGGING Related Flags
 
 OBJ=ripmime 
-RIPOLE_OBJS= ripOLE/ole.o ripOLE/olestream-unwrap.o ripOLE/bytedecoders.o  ripOLE/bt-int.o
+RIPOLE_OBJS= ripOLE/ole.o ripOLE/olestream-unwrap.o ripOLE/bytedecoders.o ripOLE/bt-int.o
 #RIPOLE_OBJS=
-OFILES= strstack.o mime.o ffget.o MIME_headers.o tnef/tnef.o rawget.o pldstr.o logger.o libmime-decoders.o boundary-stack.o uuencode.o filename-filters.o $(RIPOLE_OBJS)
-
+OFILES= strstack.o mime.o ffget.o mime_headers.o tnef/tnef.o rawget.o pldstr.o logger.o libmime-decoders.o boundary-stack.o uuencode.o filename-filters.o mime_element.o $(RIPOLE_OBJS)
 
 default: tnef/tnef.o ripmime ripOLE/ole.o
 

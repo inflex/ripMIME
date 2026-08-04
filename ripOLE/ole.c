@@ -10,31 +10,32 @@
 #include "pldstr.h"
 #include "bt-int.h"
 #include "bytedecoders.h"
+#include "mime_element.h"
 #include "olestream-unwrap.h"
 #include "ole.h"
 
 /** Sector ID values (predefined) **/
-#define OLE_SECTORID_FREE							-1 /** Unallocated sector **/
-#define OLE_SECTORID_ENDOFCHAIN					-2 /** Sector marks the end of the a sector-ID chain **/
-#define OLE_SECTORID_SAT							-3 /** Sector used by sector allocation Table  **/
-#define OLE_SECTORID_MSAT							-4 /** Sector used by master sector allocation Table **/
+#define OLE_SECTORID_FREE					-1 /** Unallocated sector **/
+#define OLE_SECTORID_ENDOFCHAIN				-2 /** Sector marks the end of the a sector-ID chain **/
+#define OLE_SECTORID_SAT					-3 /** Sector used by sector allocation Table  **/
+#define OLE_SECTORID_MSAT					-4 /** Sector used by master sector allocation Table **/
 
 // Main header accessors
-#define header_id(x)						((x) +0)
-#define header_clid(x)					((x) +0x08)
-#define header_minor_version(x)		((x) +0x18)
-#define header_dll_version(x)			((x) +0x1a)
-#define header_byte_order(x)			((x) +0x1c)
-#define header_sector_shift(x)		((x) +0x1e)
-#define header_mini_sector_shift(x)	((x) +0x20)
-#define header_fat_sector_count(x)	((x) +0x2c)
+#define header_id(x)							((x) +0)
+#define header_clid(x)							((x) +0x08)
+#define header_minor_version(x)					((x) +0x18)
+#define header_dll_version(x)					((x) +0x1a)
+#define header_byte_order(x)					((x) +0x1c)
+#define header_sector_shift(x)					((x) +0x1e)
+#define header_mini_sector_shift(x)				((x) +0x20)
+#define header_fat_sector_count(x)				((x) +0x2c)
 #define header_directory_stream_start_sector(x)	((x) +0x30)
-#define header_mini_cutoff_size(x)	((x) +0x38)
-#define header_mini_fat_start(x)		((x) +0x3c)
-#define header_mini_fat_sector_count(x)	((x) +0x40)
-#define header_dif_start_sector(x)	((x) +0x44)
-#define header_dif_sector_count(x)	((x) +0x48)
-#define header_fat_sectors(x)			((x) +0x4c)
+#define header_mini_cutoff_size(x)				((x) +0x38)
+#define header_mini_fat_start(x)				((x) +0x3c)
+#define header_mini_fat_sector_count(x)			((x) +0x40)
+#define header_dif_start_sector(x)				((x) +0x44)
+#define header_dif_sector_count(x)				((x) +0x48)
+#define header_fat_sectors(x)					((x) +0x4c)
 
 //Property Storage accessor macros
 #define pps_rawname(x)				((x) +0)
@@ -42,34 +43,33 @@
 #define pps_type(x)					((x) +0x42)
 #define pps_previouspps(x)			((x) +0x44)
 #define pps_nextpps(x)				((x) +0x48)
-#define pps_directorypps(x)		((x) +0x4c)
-#define pps_time1seconds(x)		((x) +0x64)
+#define pps_directorypps(x)			((x) +0x4c)
+#define pps_time1seconds(x)			((x) +0x64)
 #define pps_time1days(x)			((x) +0x68)
-#define pps_time2seconds(x)		((x) +0x6c)
+#define pps_time2seconds(x)			((x) +0x6c)
 #define pps_time2days(x)			((x) +0x70)
 #define pps_propertystart(x)		((x) +0x74)
 #define pps_sizeofproperty(x)		((x) +0x78)
 
 // Type lenghts
 #define LEN_BYTE	1
-#define LEN_USHORT 2
+#define LEN_USHORT	2
 #define LEN_ULONG	4
 
 // Directory types
-#define STGTY_INVALID 0
-#define STGTY_STORAGE 1
-#define STGTY_STREAM 2
-#define STGTY_LOCKBYTES 3
-#define STGTY_PROPERTY 4
-#define STGTY_ROOT 5
+#define STGTY_INVALID	0
+#define STGTY_STORAGE	1
+#define STGTY_STREAM	2
+#define STGTY_LOCKBYTES	3
+#define STGTY_PROPERTY	4
+#define STGTY_ROOT		5
 
 // Directory tag colours
-#define DE_RED 0
-#define DE_BLACK 1
+#define DE_RED		0
+#define DE_BLACK	1
 
 #define DOLE	if (OLE_DNORMAL(ole->debug))
 #define VOLE	if (ole->verbose)
-
 
 unsigned char OLE_id_v2[]={ 0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1 };
 unsigned char OLE_id_v1[]={ 0x0e, 0x11, 0xfc, 0x0d, 0xd0, 0xcf, 0x11, 0xe0 };
@@ -95,7 +95,6 @@ int OLE_version( void )
 
 	return 0;
 }
-
 
 /*-----------------------------------------------------------------\
   Function Name	: OLE_init
@@ -241,7 +240,7 @@ Changes:
 int OLE_set_debug( struct OLE_object *ole, int level )
 {
 	ole->debug = level;
-	if (ole->debug > 0) LOGGER_log("%s:%d:OLE_set_debug: Debug level set to %d",FL, ole->debug);
+	if (ole->debug > 0) LOGGER_log("%s:%d:%s: Debug level set to %d",FL,__func__, ole->debug);
 
 	return OLE_OK;
 }
@@ -323,7 +322,7 @@ int OLE_get_block( struct OLE_object *ole, int block_index, unsigned char *block
 {
 	if (block_buffer == NULL)
 	{
-		LOGGER_log("%s:%d:OLE_get_block:ERROR: Block buffer is NULL",FL);
+		LOGGER_log("%s:%d:%s:ERROR: Block buffer is NULL",FL,__func__);
 		return -1;
 	}
 
@@ -337,52 +336,52 @@ int OLE_get_block( struct OLE_object *ole, int block_index, unsigned char *block
 		bb = malloc(sizeof(unsigned char) *ole->header.sector_size);
 		if (bb == NULL)
 		{
-			LOGGER_log("%s:%d:OLE_get_block:ERROR: Cannot allocate %d bytes for OLE block",FL, ole->header.sector_size);
+			LOGGER_log("%s:%d:%s:ERROR: Cannot allocate %d bytes for OLE block",FL,__func__, ole->header.sector_size);
 			return -1;
 		}
 
-		DOLE LOGGER_log("%s:%d:OLE_get_block:DEBUG: BlockIndex=%d, Buffer=0x%x",FL, block_index, block_buffer);
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: BlockIndex=%d, Buffer=0x%x",FL,__func__, block_index, block_buffer);
 
 		//20051211-2343:PLD: offset = (block_index +1) << ole->header.sector_shift;
 		offset = OLE_sectorpos(ole, block_index);
 
-		DOLE LOGGER_log("%s:%d:OLE_get_block:DEBUG: Read offset in file = 0x%x size to read= 0x%x",FL,offset,ole->header.sector_size);
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: Read offset in file = 0x%x size to read= 0x%x",FL,__func__,offset,ole->header.sector_size);
 
 		fseek_result = fseek(ole->f, offset, SEEK_SET);
 		if (fseek_result != 0)
 		{
 			if (bb != NULL) { free(bb); bb = NULL; }
-			LOGGER_log("%s:%d:OLE_get_block:ERROR: Seek failure (block=%d:%d)",FL, block_index,offset, strerror(errno));
+			LOGGER_log("%s:%d:%s:ERROR: Seek failure (block=%d:%d)",FL,__func__, block_index,offset, strerror(errno));
 			return OLEER_GET_BLOCK_SEEK;
 		}
 
 		//read_count = fread(block_buffer, sizeof(unsigned char), ole->header.sector_size, ole->f);
 		read_count = fread(bb, sizeof(unsigned char), ole->header.sector_size, ole->f);
-		DOLE LOGGER_log("%s:%d:OLE_get_block:DEBUG: Read %d byte of data",FL,read_count);
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: Read %d byte of data",FL,__func__,read_count);
 		if (read_count != (int)ole->header.sector_size)
 		{
 			if (bb != NULL){ free(bb); bb = NULL; }
-			VOLE LOGGER_log("%s:%d:Mismatch in bytes read. Requested %d, got %d\n", FL, ole->header.sector_size, read_count);
+			VOLE LOGGER_log("%s:%d:Mismatch in bytes read. Requested %d, got %d\n", FL,__func__, ole->header.sector_size, read_count);
 			return OLEER_GET_BLOCK_READ;
 		}
 
-		DOLE LOGGER_log("%s:%d:OLE_get_block:DEBUG: Copying over memory read from file",FL);
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: Copying over memory read from file",FL,__func__);
 
 		memcpy(block_buffer, bb, ole->header.sector_size);
 
-		DOLE LOGGER_log("%s:%d:OLE_get_block:DEBUG: memory block copied to block_buffer",FL);
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: memory block copied to block_buffer",FL,__func__);
 
 		/* We're now done with BB, dispose of it */
 		if (bb) { free(bb); bb = NULL; }
 
-		DOLE LOGGER_log("%s:%d:OLE_get_block:DEBUG: Disposed of temporary bb block",FL);
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: Disposed of temporary bb block",FL,__func__);
 
 	} else {
-		LOGGER_log("%s:%d:OLE_get_block:ERROR: OLE file is closed\n",FL);
+		LOGGER_log("%s:%d:%s:ERROR: OLE file is closed\n",FL,__func__);
 		return -1;
 	}
 
-	DOLE LOGGER_log("%s:%d:OLE_get_block:DEBUG: Done",FL);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Done",FL,__func__);
 
 	return OLE_OK;
 }
@@ -827,7 +826,7 @@ int OLE_convert_directory( struct OLE_object *ole, unsigned char *buf, struct OL
 
 	/** Size of this stream **/
 	DOLE LOGGER_log("%s:%d:OLE_directory_entry:DEBUG: stream size = 0x%x %x %x %x"
-			,FL
+			,FL,__func__
 			,*(buf +0x78)
 			,*(buf +0x79)
 			,*(buf +0x7A)
@@ -904,8 +903,8 @@ int OLE_load_FAT( struct OLE_object *ole )
 	unsigned int FAT_size;
 
 	FAT_size = ole->header.fat_sector_count << ole->header.sector_shift;
-	DOLE LOGGER_log("%s:%d:OLE_load_FAT:DEBUG:Allocating for %d sectors (%d bytes) \n"
-			,FL,ole->header.fat_sector_count, FAT_size);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG:Allocating for %d sectors (%d bytes) \n"
+			,FL,__func__,ole->header.fat_sector_count, FAT_size);
 
 	ole->FAT = malloc( FAT_size *sizeof(unsigned char));
 	ole->FAT_limit = ole->FAT +FAT_size;
@@ -918,7 +917,7 @@ int OLE_load_FAT( struct OLE_object *ole )
 		if (sector_count > OLE_HEADER_FAT_SECTOR_COUNT_LIMIT)
 		{
 			sector_count = OLE_HEADER_FAT_SECTOR_COUNT_LIMIT;
-			DOLE LOGGER_log("%s:%d:OLE_load_FAT:DEBUG: sector count greater than limit; set to %d",FL, sector_count);
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: sector count greater than limit; set to %d",FL,__func__, sector_count);
 		}
 
 		// Load in all our primary-FAT sectors from the OLE file
@@ -926,7 +925,7 @@ int OLE_load_FAT( struct OLE_object *ole )
 		{
 			int getblock_result = 0;
 
-			DOLE LOGGER_log("%s:%d:OLE_load_FAT:DEBUG: Loading sector %d",FL, i);
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: Loading sector %d",FL,__func__, i);
 			getblock_result = OLE_get_block(ole, ole->header.FAT[i], fat_position);
 			if (getblock_result != 0)
 			{
@@ -945,7 +944,7 @@ int OLE_load_FAT( struct OLE_object *ole )
 			fat_position += ole->header.sector_size;
 			if (fat_position > ole->FAT_limit)
 			{ 
-				LOGGER_log("%s:%d:OLE_load_FAT:DEBUG: FAT boundary limit exceeded %p > %p", FL, fat_position, ole->FAT_limit); 
+				LOGGER_log("%s:%d:%s:DEBUG: FAT boundary limit exceeded %p > %p", FL,__func__, fat_position, ole->FAT_limit); 
 				return -1;
 			}
 		}
@@ -962,13 +961,13 @@ int OLE_load_FAT( struct OLE_object *ole )
 			unsigned char *fat_block_end;
 			unsigned int current_sector = ole->header.dif_start_sector;
 
-			DOLE LOGGER_log("%s:%d:OLE_load_FAT:DEBUG: Allocating %d bytes to fat_block\n",FL, ole->header.sector_size);
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: Allocating %d bytes to fat_block\n",FL,__func__, ole->header.sector_size);
 
 			fat_block = malloc( ole->header.sector_size );
 
 			if (fat_block == NULL) 
 			{
-				LOGGER_log("%s:%d:OLE_load_FAT:ERROR: Unable to allocate %d bytes\n", FL, ole->header.sector_size);
+				LOGGER_log("%s:%d:%s:ERROR: Unable to allocate %d bytes\n", FL,__func__, ole->header.sector_size);
 				return -1;
 				//			exit(1);
 			}
@@ -986,7 +985,7 @@ int OLE_load_FAT( struct OLE_object *ole )
 			//		contain the actual FAT data we're after (this is the double
 			//		dereference bit that twists your brain )
 
-			DOLE LOGGER_log("%s:%d:OLE_load_FAT:DEBUG: Loading DIF sectors (count = %d)",FL,ole->header.dif_sector_count);
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: Loading DIF sectors (count = %d)",FL,__func__,ole->header.dif_sector_count);
 
 			for (i = 0; i < ole->header.dif_sector_count; i++)
 			{
@@ -995,7 +994,7 @@ int OLE_load_FAT( struct OLE_object *ole )
 				int tick = 0;
 				int getblock_result;
 
-				DOLE LOGGER_log("%s:%d:OLE_load_FAT:DEBUG: Reading DIF/XBAT index-data[%d] from sector 0x%x",FL,i,current_sector);
+				DOLE LOGGER_log("%s:%d:%s:DEBUG: Reading DIF/XBAT index-data[%d] from sector 0x%x",FL,__func__,i,current_sector);
 				getblock_result = OLE_get_block(ole, current_sector, fat_block);
 				if (getblock_result != OLE_OK)
 				{
@@ -1013,23 +1012,23 @@ int OLE_load_FAT( struct OLE_object *ole )
 
 				do {
 					import_sector = get_int32( (char *) DIF );
-					DOLE LOGGER_log("%s:%d:OLE_load_FAT:DEBUG: import sector = 0x%x",FL,import_sector);
+					DOLE LOGGER_log("%s:%d:%s:DEBUG: import sector = 0x%x",FL,__func__,import_sector);
 					if (import_sector >= 0)
 					{
 						if (fat_position +ole->header.sector_size <= ole->FAT_limit)
 						{
-							DOLE LOGGER_log("%s:%d:OLE_load_FAT:DEBUG: Reading DIF/XBAT-data[%d] from sector 0x%x",FL,tick,import_sector);
+							DOLE LOGGER_log("%s:%d:%s:DEBUG: Reading DIF/XBAT-data[%d] from sector 0x%x",FL,__func__,tick,import_sector);
 							getblock_result = OLE_get_block(ole, import_sector, fat_position);
 							if (getblock_result != OLE_OK)
 							{
-								LOGGER_log("%s:%d:OLE_load_FAT:ERROR: Not able to load block, import sector = 0x%x, fat position = 0x%x",FL, import_sector, fat_position);
+								LOGGER_log("%s:%d:%s:ERROR: Not able to load block, import sector = 0x%x, fat position = 0x%x",FL,__func__, import_sector, fat_position);
 								if (fat_block) free(fat_block);
 								return getblock_result;
 							}
 
 							fat_position += ole->header.sector_size;
-							DOLE LOGGER_log("%s:%d:OLE_load_FAT:DEBUG: FAT position = 0x%x (start = 0x%x, end = 0x%x)"
-									,FL
+							DOLE LOGGER_log("%s:%d:%s:DEBUG: FAT position = 0x%x (start = 0x%x, end = 0x%x)"
+									,FL,__func__
 									,fat_position
 									,fat_block
 									,ole->FAT_limit
@@ -1038,22 +1037,22 @@ int OLE_load_FAT( struct OLE_object *ole )
 							//if (fat_position +ole->header.sector_size > ole->FAT_limit)
 							if (fat_position > ole->FAT_limit)
 							{ 
-								DOLE LOGGER_log("%s:%d:OLE_load_FAT:ERROR: FAT memory boundary limit exceeded %p >= %p",FL,fat_position,ole->FAT_limit); 
+								DOLE LOGGER_log("%s:%d:%s:ERROR: FAT memory boundary limit exceeded %p >= %p",FL,__func__,fat_position,ole->FAT_limit); 
 								if (fat_block) free(fat_block);
 								return OLEER_MEMORY_OVERFLOW;
 							}
 							tick++;
 							DIF += LEN_ULONG;
 						}  else {
-							LOGGER_log("%s:%d:OLE_load_FAT:ERROR: FAT memory boundary limit exceeded %p >= %p",FL,fat_position,ole->FAT_limit); 
+							LOGGER_log("%s:%d:%s:ERROR: FAT memory boundary limit exceeded %p >= %p",FL,__func__,fat_position,ole->FAT_limit); 
 							if (fat_block) free(fat_block);
 							return OLEER_MEMORY_OVERFLOW;
 						}
 					} else {
-						VOLE LOGGER_log("%s:%d:OLE_load_FAT:ERROR: sector request was negative (%d)",FL, import_sector);
+						VOLE LOGGER_log("%s:%d:%s:ERROR: sector request was negative (%d)",FL,__func__, import_sector);
 					}
 
-					DOLE LOGGER_log("%s:%d:OLE_load_FAT:DEBUG: DIF = 0x%x",FL,DIF);
+					DOLE LOGGER_log("%s:%d:%s:DEBUG: DIF = 0x%x",FL,__func__,DIF);
 				} while ((import_sector >= 0)&&(DIF < fat_block_end));
 
 				// Get the next sector of DIF/XBAT data ...
@@ -1066,7 +1065,7 @@ int OLE_load_FAT( struct OLE_object *ole )
 				if ( i < ole->header.dif_sector_count -1 )
 				{
 					current_sector = get_uint32((char *) fat_block_end );
-					DOLE LOGGER_log("%s:%d:OLE_load_FAT:DEBUG: Next DIF/XBAT index sector located at 0x%x",FL,current_sector);
+					DOLE LOGGER_log("%s:%d:%s:DEBUG: Next DIF/XBAT index sector located at 0x%x",FL,__func__,current_sector);
 					if (current_sector < 0) break;
 				}
 			} // For every DIF/XBAT sector we're supposed to read
@@ -1078,8 +1077,6 @@ int OLE_load_FAT( struct OLE_object *ole )
 
 	return OLE_OK;
 }
-
-
 
 /*-----------------------------------------------------------------\
   Function Name	: OLE_follow_chain
@@ -1109,7 +1106,7 @@ int OLE_follow_chain( struct OLE_object *ole, int FAT_sector_start )
 
 	if (FAT_sector_start < 0) return 0;
 
-	DOLE LOGGER_log("%s:%d:OLE_follow_chain:DEBUG: Starting chain follow at sector %d",FL, FAT_sector_start );
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Starting chain follow at sector %d",FL,__func__, FAT_sector_start );
 
 	do {
 		unsigned int next_sector;
@@ -1117,7 +1114,7 @@ int OLE_follow_chain( struct OLE_object *ole, int FAT_sector_start )
 
 		next_sector_location = ole->FAT +(LEN_ULONG *current_sector);
 		if (next_sector_location > (ole->FAT_limit -4)) {
-			DOLE LOGGER_log("%s:%d:OLE_follow_chain:DEBUG: ERROR: Next sector was outside of the limits of this file (%ld > %ld)",FL, next_sector_location, ole->FAT_limit);
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: ERROR: Next sector was outside of the limits of this file (%ld > %ld)",FL,__func__, next_sector_location, ole->FAT_limit);
 			break;
 		}
 
@@ -1126,13 +1123,13 @@ int OLE_follow_chain( struct OLE_object *ole, int FAT_sector_start )
 
 		if (BTI_add(&n, next_sector) != 0)
 		{
-			DOLE LOGGER_log("%s:%d:OLE_follow_chain:DEBUG: Sector collision, terminating chain traversal",FL);
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: Sector collision, terminating chain traversal",FL,__func__);
 			chain_length=-1;
 
 			break;
 		}
 
-		DOLE LOGGER_log("%s:%d:OLE_follow_chain:DEBUG: 0x%0X:%d)->(0x%0X:%d)\n",FL, current_sector, current_sector, next_sector, next_sector);
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: 0x%0X:%d)->(0x%0X:%d)\n",FL,__func__, current_sector, current_sector, next_sector, next_sector);
 
 		// 20040729-10H37 Added this to prevent endless loop which sometimes occurs at sector 0
 
@@ -1186,22 +1183,22 @@ int OLE_follow_minichain( struct OLE_object *ole, int miniFAT_sector_start )
 	int chain_length=0;
 	int break_out = 0;
 
-	DOLE LOGGER_log("%s:%d:OLE_follow_minichain:DEBUG: Starting at sector %d",FL, miniFAT_sector_start);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Starting at sector %d",FL,__func__, miniFAT_sector_start);
 
 	if (miniFAT_sector_start < 0) return 0;
 
 	do {
 		unsigned int next_sector;
 
-		DOLE LOGGER_log("%s:%d:OLE_follow_minichain:DEBUG: Requesting 4-byte value at '%d'",FL, ole->miniFAT +(LEN_ULONG *current_sector));
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: Requesting 4-byte value at '%d'",FL,__func__, ole->miniFAT +(LEN_ULONG *current_sector));
 		if (ole->miniFAT +(LEN_ULONG *current_sector) > ole->miniFAT_limit) {
-			DOLE LOGGER_log("%s:%d:OLE_follow_minichain:DEBUG: Requested location is out of bounds\n",FL);
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: Requested location is out of bounds\n",FL,__func__);
 			return 0;
 		}
 
 		next_sector = get_uint32((char*) ole->miniFAT +(LEN_ULONG *current_sector));
 
-		DOLE LOGGER_log("%s:%d:OLE_follow_minichain:DEBUG: Current Msector(0x%0X:%d)->next(0x%0X:%d)\n", FL, current_sector, current_sector, next_sector, next_sector);
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: Current Msector(0x%0X:%d)->next(0x%0X:%d)\n", FL,__func__, current_sector, current_sector, next_sector, next_sector);
 
 		/** Check for conditions that indicate we should stop traversing this chain **/
 
@@ -1223,10 +1220,10 @@ int OLE_follow_minichain( struct OLE_object *ole, int miniFAT_sector_start )
 				break_out=0;
 		};
 
-		DOLE LOGGER_log("%s:%d:OLE_follow_minichain:DEBUG: current sector = %d",FL,current_sector);
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: current sector = %d",FL,__func__,current_sector);
 	} while ((break_out==0)&&(current_sector <= ole->last_sector ));
 
-	DOLE LOGGER_log("%s:%d:OLE_follow_minichain:DEBUG: Done.  Chainlength=%d",FL, chain_length);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Done.  Chainlength=%d",FL,__func__, chain_length);
 
 	return chain_length;
 }
@@ -1258,13 +1255,13 @@ unsigned char *OLE_load_minichain( struct OLE_object *ole, int miniFAT_sector_st
 	unsigned char *buffer;
 	unsigned char *bp;
 
-	DOLE LOGGER_log("%s:%d:OLE_load_minichain:DEBUG: Loading minichain starting at %d",FL, miniFAT_sector_start);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Loading minichain starting at %d",FL,__func__, miniFAT_sector_start);
 
 	// Added this sanity checking 2003 Aug 28
 	if (miniFAT_sector_start < 0) return NULL;
 
 	chain_length = OLE_follow_minichain( ole, miniFAT_sector_start );
-	DOLE LOGGER_log("%s:%d:OLE_load_minichain:DEBUG: Found %d mini-sectors to load (%d bytes)\n",FL, chain_length, chain_length *ole->header.mini_sector_size);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Found %d mini-sectors to load (%d bytes)\n",FL,__func__, chain_length, chain_length *ole->header.mini_sector_size);
 
 	// 20040911-21H59
 	// If our chain is 0 length, then there's nothing to return
@@ -1276,7 +1273,7 @@ unsigned char *OLE_load_minichain( struct OLE_object *ole, int miniFAT_sector_st
 		do {
 			unsigned int next_sector;
 
-			DOLE LOGGER_log("%s:%d:OLE_load_minichain:DEBUG: Loading sector %d",FL, current_sector);
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: Loading sector %d",FL,__func__, current_sector);
 			OLE_get_miniblock( ole, current_sector, bp );
 			bp += ole->header.mini_sector_size;
 
@@ -1284,10 +1281,10 @@ unsigned char *OLE_load_minichain( struct OLE_object *ole, int miniFAT_sector_st
 			current_sector = next_sector;
 		} while ((current_sector != OLE_SECTORID_ENDOFCHAIN)&&(current_sector >= 0)&&(current_sector <= ole->last_sector));
 	} else {
-		LOGGER_log("%s:%d:OLE_get_miniblock:ERROR: Failed to allocate enough memory for miniChain",FL);
+		LOGGER_log("%s:%d:OLE_get_miniblock:ERROR: Failed to allocate enough memory for miniChain",FL,__func__);
 	}
 
-	DOLE LOGGER_log("%s:%d:OLE_load_minichain:DEBUG: Done. buffer=%p",FL, buffer);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Done. buffer=%p",FL,__func__, buffer);
 
 	return buffer;
 }
@@ -1324,10 +1321,10 @@ unsigned char *OLE_load_chain( struct OLE_object *ole, int FAT_sector_start )
 
 	if (FAT_sector_start < 0) return NULL;
 
-	DOLE LOGGER_log("%s:%d:OLE_load_chain:DEBUG: Loading chain, starting at sector %d",FL,FAT_sector_start);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Loading chain, starting at sector %d",FL,__func__,FAT_sector_start);
 
 	chain_length = OLE_follow_chain( ole, FAT_sector_start );
-	DOLE LOGGER_log("%s:%d:OLE_load_chain:DEBUG: %d sectors need to be loaded",FL,chain_length);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: %d sectors need to be loaded",FL,__func__,chain_length);
 
 	if (chain_length > 0)
 	{
@@ -1337,7 +1334,7 @@ unsigned char *OLE_load_chain( struct OLE_object *ole, int FAT_sector_start )
 		bp = buffer = malloc( offset *sizeof(unsigned char));
 		if (buffer == NULL)
 		{
-			LOGGER_log("%s:%d:OLE_load_chain:ERROR: Cannot allocate %d bytes for OLE chain",FL,offset);
+			LOGGER_log("%s:%d:%s:ERROR: Cannot allocate %d bytes for OLE chain",FL,__func__,offset);
 			return NULL;
 		}
 
@@ -1350,7 +1347,7 @@ unsigned char *OLE_load_chain( struct OLE_object *ole, int FAT_sector_start )
 			do {
 				int next_sector;
 
-				DOLE LOGGER_log("%s:%d:OLE_load_chain:DEBUG: Loading sector[%d] %d",FL, tick, current_sector );
+				DOLE LOGGER_log("%s:%d:%s:DEBUG: Loading sector[%d] %d",FL,__func__, tick, current_sector );
 
 				ole->error = OLE_get_block( ole, current_sector, bp );
 				if (ole->error != OLE_OK)
@@ -1362,7 +1359,7 @@ unsigned char *OLE_load_chain( struct OLE_object *ole, int FAT_sector_start )
 				bp += ole->header.sector_size;
 				if (bp > bp_limit) {  
 					if (buffer != NULL) { free(buffer); bp = buffer = NULL; }
-					VOLE LOGGER_log("%s:%d:OLE_load_chain:ERROR: Load-chain went over memory boundary",FL); 
+					VOLE LOGGER_log("%s:%d:%s:ERROR: Load-chain went over memory boundary",FL,__func__); 
 					return NULL;
 				};
 
@@ -1372,9 +1369,37 @@ unsigned char *OLE_load_chain( struct OLE_object *ole, int FAT_sector_start )
 			} while ((current_sector >= 0)&&(current_sector <= ole->last_sector));
 		}
 	}
-	DOLE LOGGER_log("%s:%d:OLE_load_chain:DEBUG: Done loading chain",FL);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Done loading chain",FL,__func__);
 
 	return buffer;
+}
+
+/*-----------------------------------------------------------------\
+  Function Name	: OLE_input_file_data_ini
+  Returns Type	: int
+  ----Parameter List
+  1. struct OLE_object *ole, 
+  ------------------
+  Exit Codes	: 
+  Side Effects	: 
+  --------------------------------------------------------------------
+Comments:
+
+--------------------------------------------------------------------
+Changes:
+\------------------------------------------------------------------*/
+int OLE_input_file_data_ini( struct OLE_object *ole )
+{
+		fseek(ole->f, 0L, SEEK_END);
+		ole->file_size = ftell(ole->f);
+		fseek(ole->f, 0L, SEEK_SET);
+		if (ole->file_size < OLE_HEADER_BLOCK_SIZE) {
+			fclose(ole->f);
+			ole->f = NULL;
+			return OLEER_NOT_OLE_FILE;
+		}
+		ole->last_sector = -1;
+	return OLE_OK;
 }
 
 /*-----------------------------------------------------------------\
@@ -1395,42 +1420,22 @@ Changes:
 can use this in the sanity checking to see if the 
 requested sectors are outside of the possible valid
 filesize range.
-
+20220425-mkgrgis: rewrite file size to seek, exclude FS operations
 \------------------------------------------------------------------*/
 int OLE_open_file( struct OLE_object *ole, char *fullpath )
 {
-	struct stat st;
-	int stat_result;
-	FILE *f;
-
-	stat_result = stat(fullpath, &st);
-	if (stat_result != 0) {
-		DOLE LOGGER_log("%s:%d:OLE_open_file:ERROR: Cannot locate file '%s' for opening (%s)",FL, fullpath, strerror(errno));
-		return OLEER_BAD_INPUT_FILE;
-	}
-
-	DOLE LOGGER_log("%s:%d:OLE_open_file:DEBUG: File size of %s = %ld",FL, fullpath, st.st_size);
-	if ((stat_result == 0) && (st.st_size < 512)) return OLEER_NOT_OLE_FILE;
-
-	ole->file_size = st.st_size;
-
-	f = fopen(fullpath,"r");
-	if (f == NULL)
+	ole->f = fopen(fullpath,"r");
+	if (ole->f == NULL)
 	{
-		ole->f = NULL;
 		if (ole->quiet == 0)
 		{
-			LOGGER_log("%s:%d:OLE_open_file:ERROR:Cannot open %s for reading (%s)\n",FL,fullpath, strerror(errno));
+			LOGGER_log("%s:%d:%s:ERROR:Cannot open %s for reading (%s)\n",FL,__func__,fullpath, strerror(errno));
 		}
 		return -1;
-	} else {
-		ole->f = f;
-		ole->file_size = st.st_size;
-		ole->last_sector = -1;
 	}
-	return OLE_OK;
+	else
+		return OLE_OK;
 }
-
 
 /*-----------------------------------------------------------------\
   Function Name	: OLE_open_directory
@@ -1448,14 +1453,14 @@ Comments:
 Changes:
 
 \------------------------------------------------------------------*/
-int OLE_open_directory( struct OLE_object *ole, char *directory )
+int OLE_open_directory( struct OLE_object *ole, RIPMIME_output *unpack_metadata )
 {
 	int result=0;
 
-	result = mkdir( directory, S_IRWXU );
+	result = mkdir( unpack_metadata->dir, S_IRWXU );
 	if ((result != 0)&&(errno != EEXIST))
 	{
-		LOGGER_log("%s:%d:OLE_open_directory:ERROR: %s",FL,strerror(errno));
+		LOGGER_log("%s:%d:%s:ERROR: %s",FL,__func__,strerror(errno));
 	} else result = OLE_OK;
 
 	return result;
@@ -1505,49 +1510,26 @@ Comments:
 Changes:
 
 \------------------------------------------------------------------*/
-int OLE_store_stream( struct OLE_object *ole, char *stream_name, char *directory, char *stream, size_t stream_size )
+int OLE_store_stream( struct OLE_object *ole, char *stream_name, RIPMIME_output *unpack_metadata, char *stream, size_t stream_size )
 {
-	char *full_path = NULL;
+	MIME_element* cur_mime = MIME_element_add (NULL, unpack_metadata, stream_name, "OLE", "OLE", "OLE", 0, 1, 0, __func__);
 
-	full_path = PLD_dprintf("%s/%s", directory, stream_name);
-	if (full_path == NULL)
+	size_t written_bytes = fwrite( stream, 1, stream_size, cur_mime->f );
+	if (written_bytes != stream_size)
 	{
-		LOGGER_log("%s:%d:OLE_store_stream:ERROR: Cannot compose full filename string from '%s' and '%s'", FL, directory, stream_name);
-		return -1;
-	} else {
-		FILE *f;
+		LOGGER_log("%s:%d:%s:WARNING: Only wrote %d of %d bytes to file %s",FL,__func__,written_bytes,stream_size,cur_mime->fullpath);
+	}
+	MIME_element_deactivate (cur_mime, unpack_metadata);
 
-		f = fopen(full_path,"w");
-		if (f == NULL)
-		{
-			LOGGER_log("%s:%d:OLE_store_stream:ERROR: Cannot open %s for writing (%s)",FL, full_path, strerror(errno));
-			if (full_path) free(full_path);
-			return -1;
-		} else {
-			size_t written_bytes;
-
-			written_bytes = fwrite( stream, 1, stream_size, f );
-			if (written_bytes != stream_size)
-			{
-				LOGGER_log("%s:%d:OLE_store_stream:WARNING: Only wrote %d of %d bytes to file %s",FL,written_bytes,stream_size,full_path);
-			}
-			fclose(f);
-
-			if ((OLE_VNORMAL(ole->verbose))&&(ole->filename_report_fn != NULL))
-			{
-				ole->filename_report_fn( stream_name );
-			}
-		} // if file is valid
-	} // if full_path is valid
-
-	if (full_path) free(full_path);
-
+	if ((OLE_VNORMAL(ole->verbose))&&(ole->filename_report_fn != NULL))
+	{
+		ole->filename_report_fn( stream_name );
+	}
 	return OLE_OK;
 }
 
-
 /*-----------------------------------------------------------------\
-  Function Name	: OLE_decode_file_done
+  Function Name	: OLE_decode_done
   Returns Type	: int
   ----Parameter List
   1. struct OLE_object *ole , 
@@ -1561,16 +1543,15 @@ Comments:
 Changes:
 
 \------------------------------------------------------------------*/
-int OLE_decode_file_done( struct OLE_object *ole )
+void OLE_decode_done( struct OLE_object *ole )
 {
-	if (ole->f) fclose(ole->f);
 	/** Why weren't these active? (they were commented out ) **/
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: OLE FAT",FL,__func__);
 	if (ole->FAT) free(ole->FAT);
 	if (ole->miniFAT) free(ole->miniFAT);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: OLE streams",FL,__func__);
 	if (ole->ministream) free(ole->ministream);
 	if (ole->properties) free(ole->properties);
-
-	return 0;
 }
 
 
@@ -1592,56 +1573,11 @@ Changes:
 \------------------------------------------------------------------*/
 int OLE_terminate_and_return( struct OLE_object *ole, int result )
 {
-	OLE_decode_file_done(ole);
+	OLE_decode_done(ole);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: ole->f close",FL,__func__);
+	if (ole->f) fclose(ole->f);
 	return result;
 }
-
-
-#ifdef RIPOLE_WALK_TREE
-int OLE_walk_tree( struct OLE_object *ole, char *fname, char *decode_path, int depth ) 
-{
-
-	/** Sanity check **/
-
-	if (depth > 100) return 0;
-	if (ole->total_file_count > 10000) return 0;
-	if (element_type < 0) return 0;
-
-	switch (element_type) {
-
-		case STGTY_ROOT:
-			/** ROOT DIRECTORY ENTRY **/
-			/** ROOT DIRECTORY ENTRY **/
-			/** ROOT DIRECTORY ENTRY **/
-			DOLE LOGGER_log("%s:%d:OLE_walk_tree:DEBUG: Loading ministream/SmallBlockArray",FL);
-			ole->ministream = OLE_load_chain( ole, adir->start_sector );
-			if (ole->ministream == NULL) return OLEER_MINISTREAM_READ_FAIL;
-			DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: ministream done",FL);
-	}
-
-
-
-
-
-
-
-} else if (adir->element_type == STGTY_STORAGE) {
-	/** STORAGE ELEMENT **/
-	/** STORAGE ELEMENT **/
-	/** STORAGE ELEMENT **/
-	DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: Item is directory, start child is at index %d\n",FL,i);
-	ole->ministream = OLE_load_chain( ole, adir->start_sector );
-	if (ole->ministream == NULL) return OLEER_MINISTREAM_READ_FAIL;
-	DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: DIRECTORY ministream done",FL);
-
-
-}
-#endif
-
-
-
-
-
 
 /*-----------------------------------------------------------------\
   Date Code:	: 20081101-020137
@@ -1661,7 +1597,7 @@ Comments:
 Changes:
 
 \------------------------------------------------------------------*/
-int OLE_decode_stream( struct OLE_object *ole,  struct OLE_directory_entry *adir, char *decode_path )
+int OLE_decode_stream( struct OLE_object *ole, struct OLE_directory_entry *adir, RIPMIME_output *unpack_metadata )
 {
 	unsigned char *stream_data;
 	struct OLEUNWRAP_object oleuw;
@@ -1672,52 +1608,49 @@ int OLE_decode_stream( struct OLE_object *ole,  struct OLE_directory_entry *adir
 	memset(element_name, '\0', 64);
 	OLE_dbstosbs( adir->element_name, adir->element_name_byte_count, element_name, 64 );
 
-	DOLE LOGGER_log("%s:%d:OLE_decode_stream:DEBUG: Decoding stream '%s'",FL, element_name);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Decoding stream '%s'",FL,__func__, element_name);
 
-	DOLE LOGGER_log("%s:%d:OLE_decode_stream:DEBUG: Initializing stream unwrapper",FL);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Initializing stream unwrapper",FL,__func__);
 	OLEUNWRAP_init(&oleuw);
 	OLEUNWRAP_set_debug(&oleuw,ole->debug);
 	OLEUNWRAP_set_verbose(&oleuw,ole->verbose);
 	OLEUNWRAP_set_filename_report_fn(&oleuw, ole->filename_report_fn);
 	OLEUNWRAP_set_save_unknown_streams(&oleuw, ole->save_unknown_streams);
-	DOLE LOGGER_log("%s:%d:OLE_decode_stream:DEBUG: Unwrap engine set.",FL);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Unwrap engine set.",FL,__func__);
 
 	if (adir->stream_size >= ole->header.mini_cutoff_size)
 	{
 		/** Standard size sector stored stream **/
 		/** Standard size sector stored stream **/
 		/** Standard size sector stored stream **/
-		DOLE LOGGER_log("%s:%d:OLE_decode_stream:DEBUG:  Loading normal sized chain starting at sector %d",FL, adir->start_sector);
+		DOLE LOGGER_log("%s:%d:%s:DEBUG:  Loading normal sized chain starting at sector %d",FL,__func__, adir->start_sector);
 		stream_data = OLE_load_chain( ole, (int)adir->start_sector );
 		if (stream_data == NULL)
 		{
-			DOLE LOGGER_log("%s:%d:OLE_decode_stream:DEBUG: Terminating from stream data being NULL  ",FL);
-			//OLE_decode_file_done(ole);
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: Terminating from stream data being NULL  ",FL,__func__);
+			//OLE_decode_done(ole);
 			return OLEER_MINISTREAM_STREAM_READ_FAIL;
 		}
-		DOLE LOGGER_log("%s:%d:OLE_decode_stream:DEBUG: Normal decode START. element name ='%s' stream size = '%ld'",FL, element_name, adir->stream_size);
-		decode_result = OLEUNWRAP_decodestream( &oleuw, element_name, (char *)stream_data, adir->stream_size, decode_path );
-		DOLE LOGGER_log("%s:%d:OLE_decode_stream:DEBUG: Normal decode done.",FL);
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: Normal decode START. element name ='%s' stream size = '%ld'",FL,__func__, element_name, adir->stream_size);
+		decode_result = OLEUNWRAP_decodestream( &oleuw, element_name, (char *)stream_data, adir->stream_size, unpack_metadata );
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: Normal decode done.",FL,__func__);
 	} else {
 
-
 		/** Minichain/Minisector stored stream **/
-		/** Minichain/Minisector stored stream **/
-		/** Minichain/Minisector stored stream **/
-		DOLE LOGGER_log("%s:%d:OLE_decode_stream:DEBUG: Minichain loader, starting at sector %d"
-				,FL
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: Minichain loader, starting at sector %d"
+				,FL,__func__
 				,adir->start_sector
 				);
 		stream_data = OLE_load_minichain( ole, adir->start_sector );
 		if (stream_data == NULL)
 		{
-			DOLE LOGGER_log("%s:%d:OLE_decode_stream:DEBUG: Ministream was non-existant, terminating",FL);
-			//OLE_decode_file_done(ole);
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: Ministream was non-existant, terminating",FL,__func__);
+			//OLE_decode_done(ole);
 			return OLEER_NORMALSTREAM_STREAM_READ_FAIL;
 		}
-		DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: Mini decode START.",FL);
-		decode_result = OLEUNWRAP_decodestream( &oleuw, element_name, (char *)stream_data, adir->stream_size, decode_path );
-		DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: Mini decode done.",FL);
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: Mini decode START.",FL,__func__);
+		decode_result = OLEUNWRAP_decodestream( &oleuw, element_name, (char *)stream_data, adir->stream_size, unpack_metadata );
+		DOLE LOGGER_log("%s:%d:%s:DEBUG: Mini decode done.",FL,__func__);
 	}
 
 	if ((stream_data != NULL)&&(decode_result == OLEUW_STREAM_NOT_DECODED)&&(ole->save_unknown_streams))
@@ -1727,8 +1660,8 @@ int OLE_decode_stream( struct OLE_object *ole,  struct OLE_directory_entry *adir
 		lfname = PLD_dprintf("ole-stream.%d",adir->start_sector);
 		if (lfname != NULL)
 		{
-			DOLE LOGGER_log("%s:%d:OLE_decode_stream:DEBUG: Saving stream to %s",FL,lfname);
-			OLE_store_stream( ole, lfname, decode_path, (char *) stream_data, adir->stream_size );
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: Saving stream to %s",FL,__func__,lfname);
+			OLE_store_stream( ole, lfname, unpack_metadata, (char *) stream_data, adir->stream_size );
 			free(lfname);
 		} 
 	} // If we needed to save an unknown stream
@@ -1740,53 +1673,26 @@ int OLE_decode_stream( struct OLE_object *ole,  struct OLE_directory_entry *adir
 	return result;
 }
 
-/*-----------------------------------------------------------------\
-  Function Name	: OLE_decode_file
-  Returns Type	: int
-  ----Parameter List
-  1. char *fname, 
-  2.  char *decode_path , 
-  ------------------
-  Exit Codes	: 
-  Side Effects	: 
-  --------------------------------------------------------------------
-Comments:
-
---------------------------------------------------------------------
-Changes:
-
-\------------------------------------------------------------------*/
-int OLE_decode_file( struct OLE_object *ole, char *fname, char *decode_path )
+int OLE_decode( struct OLE_object *ole, RIPMIME_output *unpack_metadata )
 {
 	unsigned char *current_property, *property_limit;
 	int result = 0;
 	int i;
 
-	// Reject any bad paramters.
-	if (ole == NULL) return OLEER_DECODE_NULL_OBJECT;
-	if (fname == NULL) return OLEER_DECODE_NULL_FILENAME;
-	if (decode_path == NULL) return OLEER_DECODE_NULL_PATH;
-
-	// We need to gain access to the OLE2 data file, without
-	//		this pretty much everything is pointless.
-	DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: opening %s", FL, fname );
-	result = OLE_open_file( ole, fname );
-	if (result != 0) return result;
-
 	// Try create the output directory which we're using
 	//		to write the decoded files out to.
-	DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: opening output directory %s", FL, decode_path);
-	result = OLE_open_directory( ole, decode_path );
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: opening output directory %s", FL,__func__, unpack_metadata->dir);
+	result = OLE_open_directory( ole, unpack_metadata);
 	if (result != 0) return result;
 
 	// In order to successfully decode an OLE2 stream, we have to read
 	//		and understand the first 512 bytes of the file, this is the 
 	//		OLE2 header. 
-	DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: Getting main header", FL);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Getting main header", FL,__func__);
 	result = OLE_get_header( ole );
 	if (result != 0) return result;
 
-	DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: Converting main header", FL);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Converting main header", FL,__func__);
 	result = OLE_convert_header( ole );
 	if (result != 0) return result;
 
@@ -1795,15 +1701,15 @@ int OLE_decode_file( struct OLE_object *ole, char *fname, char *decode_path )
 
 	DOLE OLE_print_header( ole );
 
-	DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: Loading FAT", FL);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Loading FAT", FL,__func__);
 	result = OLE_load_FAT( ole );
 	if (result != 0) return result;
 
-	DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: Loading miniFAT chain", FL);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Loading miniFAT chain", FL,__func__);
 	ole->miniFAT = OLE_load_chain( ole, ole->header.mini_fat_start );
 	if (ole->miniFAT == NULL) return OLEER_MINIFAT_READ_FAIL;
 
-	DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: Loading Directory stream chain", FL);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Loading Directory stream chain", FL,__func__);
 	ole->properties = OLE_load_chain( ole, ole->header.directory_stream_start_sector );
 	if (ole->properties == NULL) return OLEER_PROPERTIES_READ_FAIL;
 
@@ -1823,65 +1729,43 @@ int OLE_decode_file( struct OLE_object *ole, char *fname, char *decode_path )
 		property_value = get_uint8((char *)current_property);
 		if (property_value < 1) break;
 
-		DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG:--------- DIRECTORY INDEX: %d",FL,i);
+		DOLE LOGGER_log("%s:%d:%s:DEBUG:--------- DIRECTORY INDEX: %d",FL,__func__,i);
 
 		OLE_convert_directory( ole, current_property, adir );
 
 		DOLE {
-			LOGGER_log("%s:%d:OLE_decode_file:DEBUG: Printing directory details...",FL);
+			LOGGER_log("%s:%d:%s:DEBUG: Printing directory details...",FL,__func__);
 			OLE_print_directory( ole, adir);
-			LOGGER_log("%s:%d:OLE_decode_file:DEBUG: End of directory details",FL);
+			LOGGER_log("%s:%d:%s:DEBUG: End of directory details",FL,__func__);
 		}
 
 		if (adir->element_colour > 1) break;
 
 		if ((adir->element_type == STGTY_INVALID)||(adir->element_type > STGTY_ROOT))
 		{
-			DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: breaking out due to element type %d",FL, adir->element_type);
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: breaking out due to element type %d",FL,__func__, adir->element_type);
 			break;
-
 		} else if (adir->element_type == STGTY_ROOT){
 			/** ROOT DIRECTORY ENTRY **/
-			/** ROOT DIRECTORY ENTRY **/
-			/** ROOT DIRECTORY ENTRY **/
-			DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: Loading ministream/SmallBlockArray",FL);
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: Loading ministream/SmallBlockArray",FL,__func__);
 			ole->ministream = OLE_load_chain( ole, adir->start_sector );
 			if (ole->ministream == NULL) return OLEER_MINISTREAM_READ_FAIL;
-			DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: ministream done",FL);
-
-
-
-
-
-
-
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: ministream done",FL,__func__);
 		} else if (adir->element_type == STGTY_STORAGE) {
 			/** STORAGE ELEMENT **/
-			/** STORAGE ELEMENT **/
-			/** STORAGE ELEMENT **/
-			DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: Item is directory, start child is at index %d\n",FL,i);
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: Item is directory, start child is at index %d\n",FL,__func__,i);
 			ole->ministream = OLE_load_chain( ole, adir->start_sector );
 			if (ole->ministream == NULL) return OLEER_MINISTREAM_READ_FAIL;
-			DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: DIRECTORY ministream done",FL);
-
-
-
-
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: DIRECTORY ministream done",FL,__func__);
 		} else if (adir->element_type == STGTY_STREAM) {
 			/** STREAM ELEMENT **/
-			/** STREAM ELEMENT **/
-			/** STREAM ELEMENT **/
-			OLE_decode_stream( ole, adir, decode_path );
-
-
-
+			OLE_decode_stream( ole, adir, unpack_metadata );
 		} else {
 			/** If the element isn't of the above types then it's possibly 
 			 ** an empty element or just one used for the MSAT/SAT
 			 ** either way we just step over it and carry on **/
-			DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: Element type %d does not need to be handled",FL,adir->element_type);
+			DOLE LOGGER_log("%s:%d:%s:DEBUG: Element type %d does not need to be handled",FL,__func__,adir->element_type);
 		}
-
 		// Jump to the next property record, which
 		//		is always 128 bytes ahead.
 		current_property += 128;
@@ -1889,16 +1773,62 @@ int OLE_decode_file( struct OLE_object *ole, char *fname, char *decode_path )
 
 	} // While there are still more directory entries to read in.
 
-	DOLE LOGGER_log("%s:%d:OLE_decode_file:DEBUG: Finished",FL);
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: Finished",FL,__func__);
 
-	/*
-	//if (ole->f) fclose(ole->f);
-	fclose(ole->f);
-	if (ole->FAT) free(ole->FAT);
-	if (ole->miniFAT) free(ole->miniFAT);
-	if (ole->ministream) free(ole->ministream);
-	if (ole->properties) free(ole->properties);
+	/* OLE_decode_done(ole);
 	 */
-
 	return OLE_OK;
+}
+
+/*-----------------------------------------------------------------\
+  Function Name	: OLE_decode_diskfile
+  Returns Type	: int
+  ----Parameter List
+  1. char *fname, 
+  2.  char *decode_path , 
+  ------------------
+  Exit Codes	: 
+  Side Effects	: 
+  --------------------------------------------------------------------
+Comments:
+
+--------------------------------------------------------------------
+Changes:
+
+\------------------------------------------------------------------*/
+int OLE_decode_diskfile( struct OLE_object *ole, char *fname, RIPMIME_output *unpack_metadata )
+{
+	int result = 0;
+
+	// Reject any bad paramters.
+	if (ole == NULL) return OLEER_DECODE_NULL_OBJECT;
+	if (fname == NULL) return OLEER_DECODE_NULL_FILENAME;
+	if (unpack_metadata == NULL || unpack_metadata->dir == NULL) return OLEER_DECODE_NULL_PATH;
+
+	// We need to gain access to the OLE2 data file, without
+	//		this pretty much everything is pointless.
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: opening %s", FL,__func__, fname );
+	result = OLE_open_file( ole, fname );
+	if (result != 0) return result;
+
+	result = OLE_input_file_data_ini(ole);
+	if (result != 0) return result;
+	return OLE_decode( ole, unpack_metadata );
+}
+
+int OLE_decode_file( struct OLE_object *ole, FILE *f, RIPMIME_output *unpack_metadata )
+{
+	int result = 0;
+
+	DOLE LOGGER_log("%s:%d:%s:DEBUG: opening %s", FL,__func__);
+	// Reject any bad paramters.
+	if (ole == NULL) return OLEER_DECODE_NULL_OBJECT;
+	if (f == NULL) return OLEER_DECODE_NULL_FILENAME;
+	if (unpack_metadata == NULL || unpack_metadata->dir == NULL) return OLEER_DECODE_NULL_PATH;
+
+	ole->f = f;
+
+	result = OLE_input_file_data_ini(ole);
+	if (result != 0) return result;
+	return OLE_decode( ole, unpack_metadata );
 }

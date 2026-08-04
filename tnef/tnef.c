@@ -29,13 +29,15 @@
  * 1.3 Version (7/22/97)
  *   Ok, take out the DTR over the stream, now uses read_16.
  *
+ * 1.5 Version (4/24/24)
+ *   Rewritten from file utility to part of ripMIME
+ *
  * NOTE: THIS SOFTWARE IS FOR YOUR PERSONAL GRATIFICATION ONLY.  I DON'T
  * IMPLY IN ANY LEGAL SENSE THAT THIS SOFTWARE DOES ANYTHING OR THAT IT WILL
  * BE USEFULL IN ANY WAY.  But, you can send me fixes to it, I don't mind.
  ***************************************************************************/
 
 #include <stdio.h>
-#include <sys/stat.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
@@ -51,7 +53,7 @@
 #define VERSION "pldtnef/0.0.2"
 
 #ifndef FL
-#define FL __FILE__,__LINE__
+#define FL __FILE__, __LINE__
 #endif
 
 #define TNEF_VERBOSE ((TNEF_glb.verbose > 0))
@@ -60,33 +62,21 @@
 /** 20041207-1246:PLD: Added RT32 macro to allow for large numbers of read-tests **/
 #define RT32( num_addr, offset ) if (read_32(num_addr, offset)==-1) return -1
 
-#define TNEF_PATH_SIZE 1024
-
 struct TNEF_globals {
 	int file_num;
 	int verbose;
 	int verbosity_contenttype;
 	int debug;
-	char path[ TNEF_PATH_SIZE +1];
 
 	int TNEF_Verbose;
-	int savedata;
 
 	uint8 *tnef_home;
 	uint8 *tnef_limit;
 
 	int (*filename_decoded_report)(char *, char *);	// Pointer to our filename reporting function
-
 };
 
 static struct TNEF_globals TNEF_glb;
-
-// The variables below have been pushed into the TNEF globals
-//int Verbose = FALSE;
-//int SaveData = FALSE;
-//uint8 *tnef_home;
-//uint8 *tnef_limit;
-
 
 /*-----------------------------------------------------------------\
   Function Name	: TNEF_init
@@ -103,58 +93,15 @@ Comments:
 Changes:
 
 \------------------------------------------------------------------*/
-int TNEF_init( void )
+void TNEF_init( void )
 {
 	TNEF_glb.file_num = 0;
 	TNEF_glb.verbose = 0;
 	TNEF_glb.verbosity_contenttype = 0;
 	TNEF_glb.debug = 0;
-	TNEF_glb.savedata = 1;
 	TNEF_glb.TNEF_Verbose = 0;
 	TNEF_glb.filename_decoded_report = NULL;
-	TNEF_glb.path[0] = '\0';
-
-	return 0;
 }
-
-
-/*-----------------------------------------------------------------\
-  Function Name	: TNEF_set_decode
-  Returns Type	: int
-  ----Parameter List
-  1. int level , 
-  ------------------
-  Exit Codes	: 
-  Side Effects	: 
-  --------------------------------------------------------------------
-Comments:
-
---------------------------------------------------------------------
-Changes:
-
-\------------------------------------------------------------------*/
-int TNEF_set_decode( int level )
-{
-	TNEF_glb.savedata = level;
-
-	return TNEF_glb.savedata;
-}
-
-
-/*------------------------------------------------------------------------
-Procedure:     TNEF_set_path ID:1
-Purpose:
-Input:
-Output:
-Errors:
-------------------------------------------------------------------------*/
-int TNEF_set_path( char *path )
-{
-	snprintf( TNEF_glb.path, TNEF_PATH_SIZE , "%s", path);
-
-	return 0;
-}
-
 
 /*------------------------------------------------------------------------
 Procedure:     TNEF_set_verbosity ID:1
@@ -168,7 +115,6 @@ int TNEF_set_verbosity( int level )
 	TNEF_glb.verbose = level;
 	return TNEF_glb.verbose;
 }
-
 
 /*-----------------------------------------------------------------\
   Function Name	: TNEF_set_verbosity_contenttype
@@ -210,11 +156,8 @@ Changes:
 int TNEF_set_filename_report_fn( int (*ptr_to_fn)(char *, char *) )
 {
 	TNEF_glb.filename_decoded_report = ptr_to_fn;
-
 	return 0;
 }
-
-
 
 /*------------------------------------------------------------------------
 Procedure:     TNEF_set_debug ID:1
@@ -230,10 +173,6 @@ int TNEF_set_debug( int level )
 	return TNEF_glb.debug;
 }
 
-
-
-
-
 /* Some systems don't like to read unaligned data */
 /*------------------------------------------------------------------------
 Procedure:     read_32 ID:1
@@ -248,7 +187,7 @@ int read_32( uint32 *value, uint8 *tsp)
 
 	if ((tsp +4) > TNEF_glb.tnef_limit)
 	{
-		if ((TNEF_VERBOSE)||(TNEF_DEBUG)) LOGGER_log("%s:%d:TNEF_read_32:ERROR: Attempting to read beyond end of memory block",FL);
+		if ((TNEF_VERBOSE)||(TNEF_DEBUG)) LOGGER_log("%s:%d:%s:ERROR: Attempting to read beyond end of memory block",FL,__func__);
 		return -1;
 	}
 
@@ -278,7 +217,7 @@ int read_16( uint16 *value, uint8 *tsp)
 //PLD-20070707-17H20, how do we even compare tsp to a negative!?		||(tsp == -1)
 			)
 	{
-		if ((TNEF_VERBOSE)||(TNEF_DEBUG)) LOGGER_log("%s:%d:TNEF_read_16:ERROR: Attempting to read past end\n",FL);
+		if ((TNEF_VERBOSE)||(TNEF_DEBUG)) LOGGER_log("%s:%d:%s:ERROR: Attempting to read past end\n",FL,__func__);
 		return -1;
 	}
 
@@ -292,8 +231,6 @@ int read_16( uint16 *value, uint8 *tsp)
 	return 0;
 }
 
-
-
 /*------------------------------------------------------------------------
 Procedure:     make_string ID:1
 Purpose:
@@ -306,18 +243,8 @@ char *make_string(uint8 *tsp, int size)
 	static char s[256] = "";
 
 	snprintf(s,sizeof(s),"%s",tsp);
-
-	/** 20041106-0929:PLD: Remove this ugly old code and use snprintf() instead 
-	  int len = (size>sizeof(s)-1) ? sizeof(s)-1 : size;
-
-	  strncpy(s,tsp, len);
-	  s[len] = '\0';
-	 **/
-
 	return s;
 }
-
-
 
 /*------------------------------------------------------------------------
 Procedure:     save_attach_data ID:1
@@ -326,27 +253,27 @@ Input:
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int save_attach_data(char *title, uint8 *tsp, uint32 size)
+int save_attach_data(char *title, uint8 *tsp, uint32 size, char * file_dir)
 {
 	FILE *out;
-	char filename[1024];
-	size_t bc;
+	char * fn;
+	int fn_l = strlen(file_dir) + strlen(title) + sizeof(char) * 2;
 
-	snprintf(filename, sizeof(filename),"%s/%s", TNEF_glb.path, title );
-
-	out = fopen(filename, "w");
+	fn = malloc(fn_l);
+	snprintf(fn,fn_l,"%s/%s",file_dir,title);        
+	out = fopen(fn, "w");
 	if (!out)
 	{
-		LOGGER_log("%s:%d:TNEF_save_attach_data:ERROR: Failed opening file %s for writing (%s)\n", FL, filename, strerror(errno));
+		LOGGER_log("%s:%d:%s:ERROR: Failed opening file %s for writing (%s)\n", FL,__func__, fn, strerror(errno));
+		free(fn);
 		return -1;
 	}
 
-	bc = fwrite(tsp, sizeof(uint8), size, out);
+	free(fn);
+	fwrite(tsp, sizeof(uint8), size, out);
 	fclose(out);
 	return 0;
 }
-
-
 
 /*------------------------------------------------------------------------
 Procedure:     handle_props ID:1
@@ -355,7 +282,7 @@ Input:
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int handle_props(uint8 *tsp)
+int handle_props(uint8 *tsp, char * file_dir)
 {
 	int bytes = 0;
 	uint32 num_props = 0;
@@ -385,7 +312,7 @@ int handle_props(uint8 *tsp)
 				{
 					sprintf (filename, "XAM_%d.rtf", TNEF_glb.file_num);
 					TNEF_glb.file_num++;
-					save_attach_data(filename, tsp+bytes, num);
+					save_attach_data(filename, tsp+bytes, num, file_dir);
 				}
 				/* num + PAD */
 				bytes += num + ((num % 4) ? (4 - num%4) : 0);
@@ -429,12 +356,8 @@ int handle_props(uint8 *tsp)
 		}
 		x++;
 	}
-
 	return 0;
 }
-
-
-
 
 /*------------------------------------------------------------------------
 Procedure:     default_handler ID:1
@@ -469,11 +392,7 @@ int default_handler(uint32 attribute, uint8 *tsp, uint32 size)
 			break;
 	}
 	return 0;
-
 }
-
-
-
 
 /*------------------------------------------------------------------------
 Procedure:     read_attribute ID:1
@@ -482,13 +401,12 @@ Input:
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int read_attribute(uint8 *tsp)
+int read_attribute(uint8 *tsp, char *file_dir)
 {
 
 	int bytes = 0, header = 0;
 	int rv = 0;
 	uint32 attribute;
-	uint8 component = 0;
 	uint32 size = 0;
 	uint16 checksum = 0;
 	static char attach_title[256] = {
@@ -497,20 +415,18 @@ int read_attribute(uint8 *tsp)
 	//static uint32 attach_loc  = 0; // 2003-02-22-1231-PLD
 	static uint8 *attach_loc  = 0;
 
-	component = *tsp;
-
 	bytes += sizeof(uint8);
 
 	// Read the attributes of this component
 
-	if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_read_attribute:DEBUG: Reading Attribute...\n",FL);
+	if (TNEF_DEBUG) LOGGER_log("%s:%d:%s:DEBUG: Reading Attribute...\n",FL,__func__);
 	rv = read_32(&attribute, tsp+bytes);
 	if (rv == -1) return -1;
 	bytes += sizeof(attribute);
 
 	// Read the size of the information we have to read
 
-	if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_read_attribute: Reading Size...\n",FL);
+	if (TNEF_DEBUG) LOGGER_log("%s:%d:%s: Reading Size...\n",FL,__func__);
 	rv = read_32(&size, tsp+bytes);
 	if (rv == -1) return -1;
 	bytes += sizeof(size);
@@ -538,12 +454,12 @@ int read_attribute(uint8 *tsp)
 
 	// --END of ammendment.
 
-	if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_read_attribute:DEBUG: Reading Checksum...(offset %d, bytes=%d)\n", FL, tsp -TNEF_glb.tnef_home, bytes);
+	if (TNEF_DEBUG) LOGGER_log("%s:%d:%s:DEBUG: Reading Checksum...(offset %d, bytes=%d)\n", FL,__func__, tsp -TNEF_glb.tnef_home, bytes);
 	if (read_16(&checksum, tsp+bytes) == -1) return -1;
 
 	bytes += sizeof(checksum);
 
-	if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_read_attribute:DEBUG: Decoding attribute %d\n", FL, attribute);
+	if (TNEF_DEBUG) LOGGER_log("%s:%d:%s:DEBUG: Decoding attribute %d\n", FL,__func__, attribute);
 
 	switch (attribute) {
 		case attNull:
@@ -577,8 +493,8 @@ int read_attribute(uint8 *tsp)
 			attach_size=size;
 			//		attach_loc =(int)tsp+header; // 2003-02-22-1232-PLD
 			attach_loc =(uint8 *)tsp+header;
-			if (TNEF_glb.savedata && strlen(attach_title)>0 && attach_size > 0) {
-				if (!save_attach_data(attach_title, (uint8 *)attach_loc,attach_size))
+			if (strlen(attach_title)>0 && attach_size > 0) {
+				if (!save_attach_data(attach_title, (uint8 *)attach_loc,attach_size,file_dir))
 				{
 					if (TNEF_VERBOSE) {
 						if (TNEF_glb.filename_decoded_report == NULL)
@@ -592,14 +508,14 @@ int read_attribute(uint8 *tsp)
 				}
 				else
 				{
-					LOGGER_log("%s:%d:TNEF_read_attribute:ERROR: While saving attachment '%s'\n", FL, attach_title);
+					LOGGER_log("%s:%d:%s:ERROR: While saving attachment '%s'\n", FL,__func__, attach_title);
 				}
 			}
 			break;
 		case attAttachTitle:
 			strncpy(attach_title, make_string(tsp+header,size),255);
-			if (TNEF_glb.savedata && strlen(attach_title)>0 && attach_size > 0) {
-				if (!save_attach_data(attach_title, (uint8 *)attach_loc,attach_size))
+			if (strlen(attach_title)>0 && attach_size > 0) {
+				if (!save_attach_data(attach_title, (uint8 *)attach_loc,attach_size, file_dir))
 				{
 					if (TNEF_VERBOSE) {
 						if (TNEF_glb.filename_decoded_report == NULL)
@@ -613,7 +529,7 @@ int read_attribute(uint8 *tsp)
 				}
 				else
 				{
-					LOGGER_log("%s:%d:TNEF_read_attribute:ERROR: While saving attachment '%s'\n", FL, attach_title);
+					LOGGER_log("%s:%d:%s:ERROR: While saving attachment '%s'\n", FL,__func__, attach_title);
 				}
 			}
 			break;
@@ -636,7 +552,7 @@ int read_attribute(uint8 *tsp)
 			default_handler(attribute, tsp+header, size);
 			break;
 		case attMAPIProps:
-			if (handle_props(tsp+header)==-1) return -1;
+			if (handle_props(tsp+header, file_dir)==-1) return -1;
 			break;
 		case attRecipTable:
 			default_handler(attribute, tsp+header, size);
@@ -683,9 +599,6 @@ int read_attribute(uint8 *tsp)
 
 }
 
-
-
-
 /*------------------------------------------------------------------------
 Procedure:     decode_tnef ID:1
 Purpose:
@@ -693,7 +606,7 @@ Input:
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int TNEF_decode_tnef(uint8 *tnef_stream, int size)
+int TNEF_decode_tnef(uint8 *tnef_stream, int size, char* file_dir)
 {
 
 	int ra_response;
@@ -701,7 +614,7 @@ int TNEF_decode_tnef(uint8 *tnef_stream, int size)
 	uint16 tnef_attachkey;
 	uint8 *tsp;
 
-	if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_decode_tnef:DEBUG: Start. Size = %d\n", FL,size);
+	if (TNEF_DEBUG) LOGGER_log("%s:%d:%s:DEBUG: Start. Size = %d\n", FL,__func__,size);
 
 	// TSP == TNEF Stream Pointer (well memory block actually!)
 	//
@@ -712,9 +625,9 @@ int TNEF_decode_tnef(uint8 *tnef_stream, int size)
 	ra_response = read_32(&tnefs, tsp);
 	if ((ra_response != -1)&&(TNEF_SIGNATURE == tnefs))
 	{
-		if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_decode_tnef:DEBUG: TNEF signature is good\n",FL);
+		if (TNEF_DEBUG) LOGGER_log("%s:%d:%s:DEBUG: TNEF signature is good\n",FL,__func__);
 	} else {
-		if (TNEF_VERBOSE) LOGGER_log("%s:%d:TNEF_decode_tnef:WARNING: Bad TNEF signature, expecting %lx got %lx\n",FL,TNEF_SIGNATURE,tnefs);
+		if (TNEF_VERBOSE) LOGGER_log("%s:%d:%s:WARNING: Bad TNEF signature, expecting %lx got %lx\n",FL,__func__,TNEF_SIGNATURE,tnefs);
 	}
 
 	// Move tsp pointer along
@@ -723,7 +636,7 @@ int TNEF_decode_tnef(uint8 *tnef_stream, int size)
 
 	/** Read the TNEF Attach key **/
 	if (read_16(&tnef_attachkey, tsp) == -1) return -1;
-	if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_decode_tnef:DEBUG: TNEF Attach Key: %x\n",FL,tnef_attachkey);
+	if (TNEF_DEBUG) LOGGER_log("%s:%d:%s:DEBUG: TNEF Attach Key: %x\n",FL,__func__,tnef_attachkey);
 
 	// Move tsp pointer along
 	//
@@ -733,11 +646,11 @@ int TNEF_decode_tnef(uint8 *tnef_stream, int size)
 	//		go through entire memory block and extract
 	//		all the required attributes and files
 	//
-	if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_decode_tnef:DEBUG: TNEF - Commence reading attributes\n",FL);
+	if (TNEF_DEBUG) LOGGER_log("%s:%d:%s:DEBUG: TNEF - Commence reading attributes\n",FL,__func__);
 	while ((tsp - tnef_stream) < size)
 	{
-		if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_decode_tnef:DEBUG: Offset = %d\n", FL,tsp -TNEF_glb.tnef_home);
-		ra_response = read_attribute(tsp);
+		if (TNEF_DEBUG) LOGGER_log("%s:%d:%s:DEBUG: Offset = %d\n", FL,__func__,tsp -TNEF_glb.tnef_home);
+		ra_response = read_attribute(tsp, file_dir);
 		if ( ra_response > 0 )
 		{
 			tsp += ra_response;
@@ -746,20 +659,63 @@ int TNEF_decode_tnef(uint8 *tnef_stream, int size)
 			// Must find out /WHY/ this happens, and, how to rectify the issue.
 
 			tsp++;
-			if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_decode_tnef:WARNING: TNEF - Attempting to read attribute at %d resulted in a sub-zero response, ending decoding to be safe\n",FL,tsp);
+			if (TNEF_DEBUG) LOGGER_log("%s:%d:%s:WARNING: TNEF - Attempting to read attribute at %d resulted in a sub-zero response, ending decoding to be safe\n",FL,__func__,tsp);
 			break;
 		}
 	}
 
-	if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_decode_tnef:DEBUG: Done.\n",FL);
+	if (TNEF_DEBUG) LOGGER_log("%s:%d:%s:DEBUG: Done.\n",FL,__func__);
 
 	return 0;
 }
 
+int TNEF_file_processing( FILE *fp, char *file_dir )
+{
+	uint8 *tnef_stream;
+	int size, nread;
 
+	// Get the filesize
+	fseek(fp, 0L, SEEK_END);
+	size = ftell(fp);
+	fseek(fp, 0L, SEEK_SET);
 
+	// Allocate enough memory to read in the ENTIRE file
+	// FIXME - This could be a real consumer if multiple
+	// instances of TNEF decoding is going on
+	TNEF_glb.tnef_home = tnef_stream = (uint8 *)malloc(size);
+	TNEF_glb.tnef_limit = TNEF_glb.tnef_home +size;
 
+	// If we were unable to allocate enough memory, then we
+	// should report this
+	if (tnef_stream == NULL)
+	{
+		LOGGER_log("%s:%d:%s:ERROR: When allocating %d bytes for loading file (%s)\n", FL,__func__, size,strerror(errno));
+		if (TNEF_glb.tnef_home) free(TNEF_glb.tnef_home);
+		return -1;
+	}
 
+	// Attempt to read in the entire file
+	nread = fread(tnef_stream, sizeof(uint8), size, fp);
+
+	if (TNEF_DEBUG) LOGGER_log("%s:%d:%s:DEBUG: Read %d bytes\n", FL,__func__, nread);
+
+	// If we did not read in all the bytes, then let syslogs know!
+	if (nread < size)
+	{
+		LOGGER_log("%s:%d:%s:ERROR: while reading stream from TNEF file (%s)\n", FL,__func__, strerror(errno));
+		if (TNEF_glb.tnef_home) free(TNEF_glb.tnef_home);
+		return -1;
+	}
+
+	// Proceed to decode the file
+	TNEF_decode_tnef(tnef_stream,size, file_dir);
+
+	if (TNEF_glb.tnef_home) free(TNEF_glb.tnef_home);
+
+	if (TNEF_DEBUG) LOGGER_log("%s:%d:%s:DEBUG: finished decoding.\n",FL,__func__);
+
+	return 0;
+}
 
 /*------------------------------------------------------------------------
 Procedure:     TNEF_main ID:1
@@ -768,93 +724,25 @@ Input:
 Output:
 Errors:
 ------------------------------------------------------------------------*/
-int TNEF_main( char *filename )
+int TNEF_main( char *filename, char *file_dir )
 {
 	FILE *fp;
-	struct stat sb;
-	uint8 *tnef_stream;
-	int size, nread;
 
-	if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_main:DEBUG: Start, decoding %s\n",FL, filename);
-
-	if (TNEF_glb.savedata == 0 )
-	{
-		if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_name:DEBUG: decode_tnef is set to 0, not decoding file.",FL);
-		return 0;
-	}
-
-
-	// Test to see if the file actually exists
-	//
-	if (stat(filename,&sb) == -1)
-	{
-		LOGGER_log("%s:%d:TNEF_main:ERROR: while attempting to get details on file %s (%s)\n", FL, filename,strerror(errno));
-		return -1;
-	}
-
-	// Get the filesize
-	//
-	size = sb.st_size;
-
-	// Allocate enough memory to read in the ENTIRE file
-	// FIXME - This could be a real consumer if multiple
-	// instances of TNEF decoding is going on
-	//
-	TNEF_glb.tnef_home = tnef_stream = (uint8 *)malloc(size);
-	TNEF_glb.tnef_limit = TNEF_glb.tnef_home +size;
-
-	// If we were unable to allocate enough memory, then we
-	// should report this
-	//
-	if (tnef_stream == NULL)
-	{
-		LOGGER_log("%s:%d:TNEF_main:ERROR: When allocating %d bytes for loading file (%s)\n", FL, size,strerror(errno));
-		if (TNEF_glb.tnef_home) free(TNEF_glb.tnef_home);
-		return -1;
-	}
+	if (TNEF_DEBUG) LOGGER_log("%s:%d:%s:DEBUG: Start, decoding %s\n",FL,__func__, filename);
 
 	// Attempt to open up the TNEF encoded file... if it fails
 	// 	then report the failed condition to syslog
-	//
 	if ((fp = fopen(filename,"r")) == NULL)
 	{
-		LOGGER_log("%s:%d:TNEF_main:ERROR: opening file %s for reading (%s)\n", FL, filename,strerror(errno));
+		LOGGER_log("%s:%d:%s:ERROR: opening file %s for reading (%s)\n", FL,__func__, filename,strerror(errno));
 		if (TNEF_glb.tnef_home) free(TNEF_glb.tnef_home);
 		return -1;
 	}
-
-	// Attempt to read in the entire file
-	//
-	nread = fread(tnef_stream, sizeof(uint8), size, fp);
-
-	if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_main:DEBUG: Read %d bytes\n", FL, nread);
-
-	// If we did not read in all the bytes, then let syslogs know!
-	//
-	if (nread < size)
-	{
-		LOGGER_log("%s:%d:TNEF_main:ERROR: while reading stream from file %s (%s)\n", FL, filename,strerror(errno));
-		if (TNEF_glb.tnef_home) free(TNEF_glb.tnef_home);
-		return -1;
-	}
-
+	TNEF_file_processing(fp, file_dir);
+	
 	// Close the file
-	//
 	fclose(fp);
-
-	// Proceed to decode the file
-	//
-	TNEF_decode_tnef(tnef_stream,size);
-
-	if (TNEF_glb.tnef_home) free(TNEF_glb.tnef_home);
-
-
-	if (TNEF_DEBUG) LOGGER_log("%s:%d:TNEF_main:DEBUG: finished decoding.\n",FL);
-
 	return 0;
 }
 
-
 //--------------------------END.
-
-
