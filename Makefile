@@ -85,11 +85,12 @@ install: ${OBJ}
 ffget_test: ffget_mmap_test.c ffget_mmap.[ch] logger.o ffget_mmap.o
 	${CC} ${CFLAGS} ffget_mmap_test.c logger.o ffget_mmap.o -o ffgt
 
-
 clean:
 	rm -f *.o *core ${OBJ} buildcodes.h
 	rm -f tnef/*.o
 	rm -f ripOLE/*.o ripOLE/ripole
 
-MIMEH: MIME_headers.o strlower.o
-	${CC} ${CFLAGS} MIMEH_test.c MIME_headers.o strlower.o -o MIMEH_test
+MIMEH: MIME_headers.o strstack.o
+	${CC} ${CFLAGS} MIMEH_test.c MIME_headers.o strstack.o -o MIMEH_test
+
+check: @./test.sh
