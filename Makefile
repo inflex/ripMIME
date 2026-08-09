@@ -3,7 +3,6 @@
 #
 # 0.1.13: Added -I.
 
-LOCATION=/usr/local
 VERSION=0.1.15
 # VERSION changes
 #---------------------
@@ -15,7 +14,7 @@ VERSION=0.1.15
 #	use our recommended settings.
 #CFLAGS ?= -Wall -g -O2 -Werror $(CPU_OPTS)
 #CFLAGS=-Wall -g -O2 -Wundef -Wshadow -Wsign-compare -I.
-CFLAGS=-Wall  -I. -O2 
+CFLAGS ?= -Wall -Wextra -O2
 
 # OLE decoding is still considered to be 'beta' mode - so it 
 #	disabled in the stable release of ripMIME for now
@@ -36,60 +35,138 @@ RIPOLE_OBJS= ripOLE/ole.o ripOLE/olestream-unwrap.o ripOLE/bytedecoders.o  ripOL
 #RIPOLE_OBJS=
 OFILES= strstack.o mime.o ffget.o MIME_headers.o tnef/tnef.o rawget.o pldstr.o logger.o libmime-decoders.o boundary-stack.o uuencode.o filename-filters.o $(RIPOLE_OBJS)
 
-
-default: tnef/tnef.o ripmime ripOLE/ole.o
-
+all: ripmime
 debug: CFLAGS=-Wall -ggdb -DDEBUG -I. -O0
-debug: default
+debug: all
+sco: LIBS += -lsocket
+sco: ripmime
+.PHONY: all debug sco
 
 buildcodes.h: 
 	./generate-buildcodes.sh
 
-ripOLE/ole.o:
-	./build_ripOLE
+clean::
+	rm -f buildcodes.h
 
-tnef/tnef.o:
-	./build_tnef
+${RIPOLE_OBJS} tnef/tnef.o:
+	${MAKE} -C ${@D} ${@F} CFLAGS="${CFLAGS} ${CFLAGS-y}"
 
 .c.o:
-	${CC} ${CFLAGS} $(COMPONENTS) -c $*.c
+	${CC} ${CFLAGS-y} ${COMPONENTS} -c $*.c
 
-all: ${OBJ} 
+CFLAGS-y   = ${CFLAGS}
+LDFLAGS-y  = ${LDFLAGS}
+LDFLAGS-y += -Wl,-rpath,${libdir}
 
+CFLAGS-${use-solib}  += -fPIC
 
-solib: ${OFILES} ripmime-api.o
-	gcc --shared -Wl,-soname,libripmime.so.1 ${OFILES} ripmime-api.o -o libripmime.so.1.4.0 -lc
+solib          := libripmime.so.1.4.0
+solib-soname   != awk -vlib=${solib} -vsuffix="\\.so\\.[0-9]+" \
+	'BEGIN{match(lib,suffix);print substr(lib,1,RSTART+RLENGTH-1)}'
+solib-basename != awk -vlib=${solib} -vsuffix="\\.so" \
+	'BEGIN{match(lib,suffix);print substr(lib,1,RSTART+RLENGTH-1)}'
 
-libripmime: ${OFILES} ripmime-api.o
-	ar ruvs libripmime.a ${OFILES}  ripmime-api.o
+${solib}-LDFLAGS  := -shared -Wl,-soname,${solib-soname}
+${solib}-objs     := ${OFILES} ripmime-api.o
 
-ripl: ripmime.a
-	${CC} ${CFLAGS} ripmime.c ripmime.a -o ripmime
+solib: ${solib}
+${solib}: ${${solib}-objs}
+	${CC} ${$@-LDFLAGS} ${LDFLAGS-y} ${CFLAGS-y} -o $@ ${$@-objs} ${LIBS}
 
-sco: ${OFILES}
-	${CC} ${CFLAGS} ripmime.c ${OFILES} -o ripmime -lsocket
+clean::
+	rm -f ${solib}
 
-ripmime: ${OFILES} ripmime.c buildcodes.h
-	${CC} ${CFLAGS} $(COMPONENTS) ripmime.c ${OFILES} -o ripmime ${LIBS}
+ARFLAGS = ruvs
+libripmime.a: ${OFILES} ripmime-api.o
+	${AR} ${ARFLAGS} $@ ${OFILES} ripmime-api.o
+
+clean::
+	rm -f libripmime.a
+
+use-solib = n
+-lib := ${use-solib:y=${solib}} ${use-solib:n=libripmime.a}
+-lib := ${-lib:y=}
+-lib := ${-lib:n=}
+
+ripmime.o: buildcodes.h
+ripmime: ${-lib} ripmime.o buildcodes.h
+	${CC} ${LDFLAGS-y} ${CFLAGS-y} ${COMPONENTS} $@.o -o $@ ${-lib} ${LIBS}
 
 riptest: ${OFILES}
-	${CC} ${CFLAGS} riptest.c ${OFILES} -o riptest
+	${CC} ${LDFLAGS-y} ${CFLAGS-y} $@.c ${OFILES} -o $@
 
-install: ${OBJ}
-	strip ripmime
-	install -d ${LOCATION}/bin/
-	install -m 755 ripmime ${LOCATION}/bin/
-	install -d ${LOCATION}/man/
-	install -m 644 ripmime.1  ${LOCATION}/man/man1
+clean::
+	rm -f ripmime riptest
+
+DESTDIR =
+prefix  = /usr/local
+  exec_prefix = ${prefix}
+    bindir = ${exec_prefix}/bin
+    libdir = ${exec_prefix}/lib
+  datarootdir = ${prefix}/share
+    mandir = ${datarootdir}/man
+
+.PHONY: install install-exec install-man
+.PHONY: install-static install-shared install-headers
+
+install-static: libripmime.a
+	install -m444 -Dt ${DESTDIR}${libdir} libripmime.a
+
+install-exec${use-solib:y=}: install-shared
+install-shared: ${solib}
+	install -m555 -Dt ${DESTDIR}${libdir} ${solib}
+	ln -sf ${solib} ${DESTDIR}${libdir}/${solib-soname}
+	ln -sf ${solib} ${DESTDIR}${libdir}/${solib-basename}
+
+install: install-exec install-man
+install-exec: ${OBJ}
+	install -m555 -s -Dt ${DESTDIR}${bindir} ${OBJ}
+install-man:
+	install -m444 -Dt ${DESTDIR}${mandir}/man1 ripmime.1
 
 ffget_test: ffget_mmap_test.c ffget_mmap.[ch] logger.o ffget_mmap.o
-	${CC} ${CFLAGS} ffget_mmap_test.c logger.o ffget_mmap.o -o ffgt
+	${CC} ${LDFLAGS-y} ${CFLAGS-y} ffget_mmap_test.c logger.o ffget_mmap.o -o ffgt
 
-
-clean:
-	rm -f *.o *core ${OBJ} buildcodes.h
+.PHONY: clean
+clean::
+	rm -f *.o *core
 	rm -f tnef/*.o
 	rm -f ripOLE/*.o ripOLE/ripole
 
-MIMEH: MIME_headers.o strlower.o
-	${CC} ${CFLAGS} MIMEH_test.c MIME_headers.o strlower.o -o MIMEH_test
+.PHONY: MIMEH
+MIMEH: MIMEH_test
+MIMEH_test-objs = MIMEH_test.o MIME_headers.o strlower.o
+MIMEH_test: ${MIMEH_test-objs}
+	${CC} ${LDFLAGS-y} ${CFLAGS-y} ${$@-objs} -o $@
+clean::
+	rm -f MIMEH_test
+
+# Macro to extract a quoted & unexpanded variable
+quote = '$(subst ','\'',$(value $1))'
+
+# Save and restore configuration variables
+-include .config
+_ != { \
+	echo 'AR      = '${AR:Q}$(call quote,AR); \
+	echo 'ARFLAGS = '${ARFLAGS:Q}$(call quote,ARFLAGS); \
+	echo 'CC      = '${CC:Q}$(call quote,CC); \
+	echo 'CFLAGS  = '${CFLAGS:Q}$(call quote,CFLAGS); \
+	echo 'LDFLAGS = '${LDFLAGS:Q}$(call quote,LDFLAGS); \
+	echo 'LIBS    = '${LIBS:Q}$(call quote,LIBS); \
+	echo; \
+	echo 'prefix = '${prefix:Q}$(call quote,prefix); \
+	echo '  exec_prefix = '${exec_prefix:Q}$(call quote,exec_prefix); \
+	echo '    bindir = '${bindir:Q}$(call quote,bindir); \
+	echo '    libdir = '${libdir:Q}$(call quote,libdir); \
+	echo '  datarootdir = '${datarootdir:Q}$(call quote,datarootdir); \
+	echo '    mandir = '${mandir:Q}$(call quote,mandir); \
+	echo; \
+	echo 'use-solib     = '${use-solib:Q}$(call quote,use-solib); \
+	} > .config
+include .config
+
+# FIXME: variables (unintuitivelly) are expanded when saving in bmake
+
+.PHONY: distclean
+distclean:: clean
+	rm -f .config

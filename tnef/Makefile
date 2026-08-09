@@ -5,7 +5,7 @@
 # default is big endian.  You can do -D__TNEF_BYTE_ORDER 1234 for little
 # endian
 PLATFORM=-D___TNEF_BYTE_ORDER=4321 
-CFLAGS=-Wall -g -O2 -I.
+CFLAGS ?= -Wall -Wextra -O2
 
 default: config.h tnef.h tnef.c
 	$(CC) $(CFLAGS) $(PLATFORM) -c tnef.c
